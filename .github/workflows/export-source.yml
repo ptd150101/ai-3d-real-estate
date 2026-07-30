@@ -33,6 +33,7 @@ jobs:
           base64 --decode /tmp/p1-source.b64 > /tmp/p1-source.tar.gz
           echo '378263160fff5a4ae6f2fe669aaea8136319adde56d3b565bef16ee39b4aacad  /tmp/p1-source.tar.gz' | sha256sum -c -
           tar -xzf /tmp/p1-source.tar.gz
+          git checkout origin/main -- .github/workflows/ci.yml
           rm -f .github/workflows/export-source.yml
           rm -rf .p1
           git config user.name 'github-actions[bot]'
@@ -40,4 +41,3 @@ jobs:
           git add -A
           git commit -m 'Implement complete P1 platform'
           git push origin "HEAD:${{ github.event.pull_request.head.ref }}"
-# marker set complete
