@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from typing import Any
-from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Index, Integer, JSON, String, Text, UniqueConstraint
+from sqlalchemy import BigInteger, Boolean, DateTime, Float, ForeignKey, Index, Integer, JSON, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from ..database import Base
 from .common import TimestampMixin, new_id
@@ -16,7 +16,7 @@ class Property(Base, TimestampMixin):
     transaction_type: Mapped[str] = mapped_column(String(16), default="sale", index=True)
     property_type: Mapped[str] = mapped_column(String(48), index=True)
     status: Mapped[str] = mapped_column(String(32), default="draft", index=True)
-    price: Mapped[int] = mapped_column(Integer, index=True)
+    price: Mapped[int] = mapped_column(BigInteger, index=True)
     currency: Mapped[str] = mapped_column(String(8), default="VND")
     area_m2: Mapped[float] = mapped_column(Float, index=True)
     bedrooms: Mapped[int] = mapped_column(Integer, default=0, index=True)
