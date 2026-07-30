@@ -16,7 +16,7 @@ def upgrade():
         op.execute("CREATE EXTENSION IF NOT EXISTS vector")
     Base.metadata.create_all(bind=bind)
     if bind.dialect.name == "postgresql":
-        op.execute("CREATE INDEX IF NOT EXISTS ix_properties_geo ON properties USING gist (ST_SetSRID(ST_MakePoint(longitude, latitude), 4326)::geography) WHERE latitude IS NOT NULL AND longitude IS NOT NULL")
+        op.execute("CREATE INDEX IF NOT EXISTS ix_properties_geo ON properties USING gist ((ST_SetSRID(ST_MakePoint(longitude, latitude), 4326)::geography)) WHERE latitude IS NOT NULL AND longitude IS NOT NULL")
         op.execute("ALTER TABLE knowledge_chunks ADD COLUMN IF NOT EXISTS embedding vector(256)")
         op.execute("CREATE INDEX IF NOT EXISTS ix_knowledge_chunks_embedding_hnsw ON knowledge_chunks USING hnsw (embedding vector_cosine_ops)")
 
