@@ -1,19 +1,21 @@
 name: Expand source archive
 
 on:
-  push:
+  pull_request:
     branches:
-      - agent/implement-full-mvp
+      - main
 
 permissions:
   contents: write
 
 jobs:
   expand:
-    if: github.actor != 'github-actions[bot]'
+    if: github.event.pull_request.head.repo.full_name == github.repository && github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
       - name: Expand source
         shell: bash
         run: |
@@ -28,4 +30,4 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
           git commit -m "Implement full AI 3D real-estate MVP"
-          git push
+          git push origin HEAD:${{ github.head_ref }}
