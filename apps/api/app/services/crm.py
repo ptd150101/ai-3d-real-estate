@@ -54,10 +54,12 @@ def eligible_agents(db: Session, agency_id: str | None = None) -> list[tuple[Age
     for agent in agents:
         capacity = db.scalar(select(AgentCapacityState).where(AgentCapacityState.agent_id == agent.id))
         if not capacity:
-            capacity = AgentCapacityState(agent_id=agent.id)
+            capacity = AgentCapacityState(agent_id=agent.id, open_leads=0)
             db.add(capacity)
             db.flush()
-        if capacity.online and capacity.open_leads < capacity.max_open_leads and (not capacity.paused_until or capacity.paused_until < utcnow()):
+        open_leads = capacity.open_leads or 0
+        max_open_leads = capacity.max_open_leads or 0
+        if capacity.online and open_leads < max_open_leads and (not capacity.paused_until or capacity.paused_until < utcnow()):
             output.append((agent, capacity))
     return output
 
@@ -81,13 +83,13 @@ def route_lead(db: Session, lead: Lead) -> Agent | None:
         if not candidates:
             continue
         if rule.strategy == "least_loaded":
-            agent, _ = min(candidates, key=lambda item: (item[1].open_leads, item[1].last_assigned_at or datetime.min.replace(tzinfo=timezone.utc)))
+            agent, _ = min(candidates, key=lambda item: (item[1].open_leads or 0, item[1].last_assigned_at or datetime.min.replace(tzinfo=timezone.utc)))
         else:
             agent, _ = min(candidates, key=lambda item: item[1].last_assigned_at or datetime.min.replace(tzinfo=timezone.utc))
         return assign_lead(db, lead, agent, rule, f"Rule {rule.name}: {rule.strategy}")
     candidates = eligible_agents(db)
     if candidates:
-        agent, _ = min(candidates, key=lambda item: (item[1].open_leads, item[1].last_assigned_at or datetime.min.replace(tzinfo=timezone.utc)))
+        agent, _ = min(candidates, key=lambda item: (item[1].open_leads or 0, item[1].last_assigned_at or datetime.min.replace(tzinfo=timezone.utc)))
         return assign_lead(db, lead, agent, None, "Default least-loaded routing")
     return None
 
@@ -97,10 +99,10 @@ def assign_lead(db: Session, lead: Lead, agent: Agent, rule: AgentRoutingRule | 
     lead.assigned_agent_id = agent.id
     state = db.scalar(select(AgentCapacityState).where(AgentCapacityState.agent_id == agent.id))
     if not state:
-        state = AgentCapacityState(agent_id=agent.id)
+        state = AgentCapacityState(agent_id=agent.id, open_leads=0)
         db.add(state)
     if previous != agent.id:
-        state.open_leads += 1
+        state.open_leads = (state.open_leads or 0) + 1
     state.last_assigned_at = utcnow()
     db.add(LeadAssignmentHistory(lead_id=lead.id, agent_id=agent.id, rule_id=rule.id if rule else None, reason=reason))
     if agent.user_id:
