@@ -1,0 +1,18 @@
+name: Export source
+on:
+  push:
+    branches: ["agent/implement-p1"]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: tar --exclude=.git -czf source.tar.gz .
+      - uses: actions/upload-artifact@v4
+        with:
+          name: source-tree
+          path: source.tar.gz
+          retention-days: 1
