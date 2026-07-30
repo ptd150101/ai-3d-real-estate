@@ -1,0 +1,5 @@
+"use client";
+import { useState } from "react";
+import { clientApi } from "@/lib/client-api";
+import { track } from "@/lib/analytics";
+export function BrochureButton({propertyId}:{propertyId:string}){const[state,setState]=useState("idle");const[url,setUrl]=useState<string|null>(null);async function run(){setState("loading");try{const existing=await clientApi<any>(`/properties/${propertyId}/brochure`).catch(()=>null);if(existing?.storage_url){setUrl(existing.storage_url);setState("ready");track("brochure_downloaded",{},propertyId);return}const job=await clientApi<any>(`/properties/${propertyId}/brochure`,{method:"POST",body:JSON.stringify({template_version:"v1"})});setState(job.status==="ready"?"ready":"queued");if(job.brochure?.storage_url)setUrl(job.brochure.storage_url)}catch{setState("error")}}return url?<a className="btn btn-secondary" href={url} target="_blank" onClick={()=>track("brochure_downloaded",{},propertyId)}>Tải brochure PDF</a>:<button className="btn btn-secondary" onClick={run} disabled={state==="loading"}>{state==="loading"?"Đang tạo…":state==="queued"?"Đang xử lý PDF":"Tạo brochure PDF"}</button>}

@@ -1,0 +1,5 @@
+"use client";
+import { useEffect, useState } from "react";
+import { clientApi } from "@/lib/client-api";
+type Appointment={id:string;property_id:string;scheduled_at:string;status:string;note?:string};
+export default function Page(){const[items,setItems]=useState<Appointment[]>([]);const load=async()=>{setItems(await clientApi<Appointment[]>("/appointments/me"));};useEffect(()=>{void load();},[]);return <section className="section"><div className="container stack"><span className="eyebrow">Tài khoản</span><h1>Lịch xem nhà</h1>{items.map(x=><article className="card card-padded row-wrap" key={x.id} style={{justifyContent:"space-between"}}><div><strong>{new Date(x.scheduled_at).toLocaleString("vi-VN")}</strong><div className="muted">Mã: {x.id}</div></div><span className="badge badge-brand">{x.status}</span>{["pending","confirmed"].includes(x.status)&&<button className="btn btn-secondary" onClick={async()=>{await clientApi(`/appointments/${x.id}/status`,{method:"PATCH",body:JSON.stringify({status:"cancelled_by_buyer"})});await load();}}>Hủy lịch</button>}</article>)}{!items.length&&<div className="empty">Chưa có lịch hẹn.</div>}</div></section>}
