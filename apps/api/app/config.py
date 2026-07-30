@@ -17,10 +17,12 @@ class Settings(BaseModel):
     storage_backend: str = "local"
     storage_root: str = "./storage"
     public_base_url: str = "http://localhost:8000"
+    site_url: str = "http://localhost:3000"
     s3_endpoint: str = "http://minio:9000"
     s3_access_key: str = "local-access-key"
     s3_secret_key: str = "local-secret-key-change-me"
     s3_bucket: str = "nestora"
+    s3_private_bucket: str = "nestora-private"
     s3_public_url: str = "http://localhost:9000"
     llm_base_url: str | None = None
     llm_api_key: str | None = None
@@ -30,6 +32,18 @@ class Settings(BaseModel):
     enable_ar: bool = False
     rate_limit_per_minute: int = 60
     log_level: str = "INFO"
+    smtp_host: str | None = None
+    smtp_port: int = 587
+    smtp_user: str | None = None
+    smtp_password: str | None = None
+    smtp_from: str = "Nestora <no-reply@localhost>"
+    smtp_starttls: bool = True
+    zalo_endpoint: str | None = None
+    zalo_token: str | None = None
+    notification_webhook_secret: str = ""
+    document_signing_ttl_minutes: int = 15
+    analytics_retention_days: int = 365
+    worker_poll_seconds: int = 2
 
     @property
     def cors_origin_list(self) -> list[str]:
@@ -43,7 +57,6 @@ class Settings(BaseModel):
 @lru_cache
 def get_settings() -> Settings:
     import os
-
     values: dict[str, object] = {}
     for field in Settings.model_fields:
         env_key = field.upper()
@@ -51,10 +64,7 @@ def get_settings() -> Settings:
             continue
         raw = os.environ[env_key]
         annotation = Settings.model_fields[field].annotation
-        if annotation is bool or "bool" in str(annotation):
-            values[field] = raw.lower() in {"1", "true", "yes", "on"}
-        elif annotation is int:
-            values[field] = int(raw)
-        else:
-            values[field] = raw
+        if annotation is bool or "bool" in str(annotation): values[field] = raw.lower() in {"1", "true", "yes", "on"}
+        elif annotation is int: values[field] = int(raw)
+        else: values[field] = raw
     return Settings(**values)
