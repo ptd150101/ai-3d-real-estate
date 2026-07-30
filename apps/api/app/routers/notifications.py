@@ -133,5 +133,6 @@ def saved_search_matches(search_id: str, db: Session = Depends(get_db), user: Us
     output = []
     for item in matches:
         prop = db.get(Property, item.property_id)
-        output.append(SavedSearchMatchRead(id=item.id, saved_search_id=item.saved_search_id, property_id=item.property_id, match_score=item.match_score, current_price=item.current_price, matched_at=item.matched_at, notified_at=item.notified_at, property=property_summary(prop) if prop else None))
+        summary = property_summary(prop).model_dump(mode="json") if prop else None
+        output.append(SavedSearchMatchRead(id=item.id, saved_search_id=item.saved_search_id, property_id=item.property_id, match_score=item.match_score, current_price=item.current_price, matched_at=item.matched_at, notified_at=item.notified_at, property=summary))
     return output
