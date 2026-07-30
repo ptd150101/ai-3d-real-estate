@@ -2,7 +2,7 @@
 import { useEffect, useRef } from "react";
 import maplibregl, { Map, Marker, Popup } from "maplibre-gl";
 import type { PropertySummary } from "@/lib/types";
-import { formatPrice } from "@/lib/api";
+import { formatPrice } from "@/lib/format";
 
 export function PropertyMap({ properties }: { properties: PropertySummary[] }) {
   const container = useRef<HTMLDivElement>(null); const mapRef = useRef<Map | null>(null);
