@@ -1,6 +1,6 @@
 "use client";
 import { FormEvent, useState } from "react";
-import { formatPrice } from "@/lib/api";
+import { formatPrice } from "@/lib/format";
 
 type Result={principal:number;monthly_payment:number;total_interest:number;disclaimer:string};
 export function MortgageCalculator({price}:{price:number}){const [result,setResult]=useState<Result|null>(null);async function submit(e:FormEvent<HTMLFormElement>){e.preventDefault();const f=new FormData(e.currentTarget);const response=await fetch("/api/backend/tools/mortgage",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({property_price:price,down_payment_percent:Number(f.get("down")),annual_interest_percent:Number(f.get("rate")),term_years:Number(f.get("years")),repayment_method:f.get("method")})});if(response.ok)setResult(await response.json());}
