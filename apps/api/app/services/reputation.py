@@ -35,12 +35,13 @@ def create_review(db: Session, user: User, payload) -> AgentReview:
     existing = db.scalar(select(AgentReview).where(AgentReview.appointment_id == appointment.id))
     if existing:
         raise ValueError("Appointment was already reviewed")
+    review_data = payload.model_dump(exclude={"appointment_id"})
     item = AgentReview(
         agent_id=appointment.agent_id,
         user_id=user.id,
         appointment_id=appointment.id,
         edited_until=datetime.now(timezone.utc) + timedelta(days=7),
-        **payload.model_dump(),
+        **review_data,
     )
     db.add(item)
     db.flush()
