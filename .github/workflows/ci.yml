@@ -50,3 +50,43 @@ jobs:
           echo 'S3_ACCESS_KEY=ci-minio-user' >> .env
           echo 'S3_SECRET_KEY=ci-minio-password' >> .env
       - run: docker compose config
+
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: cp .env.example .env
+      - run: |
+          echo 'SECRET_KEY=ci-e2e-secret-key-with-more-than-thirty-two-chars' >> .env
+          echo 'POSTGRES_PASSWORD=ci-e2e-postgres-password' >> .env
+          echo 'S3_ACCESS_KEY=ci-e2e-minio-user' >> .env
+          echo 'S3_SECRET_KEY=ci-e2e-minio-password' >> .env
+          echo 'SEED_ADMIN_PASSWORD=ci-e2e-admin-password' >> .env
+          echo 'SEED_AGENT_PASSWORD=ci-e2e-agent-password' >> .env
+          echo 'SEED_BUYER_PASSWORD=ci-e2e-buyer-password' >> .env
+      - run: docker compose up -d --build postgres redis minio minio-init migrate api web
+      - name: Wait for full stack
+        run: |
+          for attempt in $(seq 1 80); do
+            if curl -fsS http://localhost:8000/health >/dev/null && curl -fsS http://localhost:3000 >/dev/null; then
+              exit 0
+            fi
+            sleep 3
+          done
+          docker compose ps
+          docker compose logs --tail=300
+          exit 1
+      - run: bash scripts/smoke.sh
+      - run: npm install
+      - run: npx playwright install --with-deps chromium
+      - run: npm --workspace apps/web run test:e2e -- --project=chromium
+        env:
+          PLAYWRIGHT_BASE_URL: http://localhost:3000
+      - if: always()
+        run: docker compose logs --tail=300
+      - if: always()
+        run: docker compose down -v
