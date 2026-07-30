@@ -1,0 +1,4 @@
+"use client";
+import { useState } from "react";
+import { useSearchParams } from "next/navigation";
+export function SaveSearchButton(){const params=useSearchParams();const[status,setStatus]=useState('');async function save(){const name=prompt('Tên bộ lọc đã lưu','Tìm kiếm của tôi');if(!name)return;const filters=Object.fromEntries(params.entries());const response=await fetch('/api/backend/saved-searches',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,filters_json:filters,notify:true})});if(response.status===401){location.href='/login';return}setStatus(response.ok?'Đã lưu và bật thông báo':'Không thể lưu')}return <div className="row-wrap"><button className="btn btn-secondary btn-sm" onClick={()=>void save()}>☆ Lưu tìm kiếm</button>{status&&<span className="muted" style={{fontSize:'.8rem'}}>{status}</span>}</div>}

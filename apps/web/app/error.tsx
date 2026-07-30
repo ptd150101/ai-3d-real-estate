@@ -1,0 +1,1 @@
+"use client";export default function Error({error,reset}:{error:Error&{digest?:string};reset:()=>void}){return <div className="container section empty"><h1 style={{fontSize:'2.5rem'}}>Đã xảy ra lỗi</h1><p>{process.env.NODE_ENV==='development'?error.message:'Không thể tải nội dung lúc này.'}</p><button className="btn btn-primary" onClick={reset}>Thử lại</button></div>}

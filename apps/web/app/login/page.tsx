@@ -1,0 +1,1 @@
+import type {Metadata}from'next';import{AuthForm}from'@/components/auth/AuthForm';export const metadata:Metadata={title:'Đăng nhập'};export default function Page(){return <div className="auth-shell"><AuthForm mode="login"/></div>}

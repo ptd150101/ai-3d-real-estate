@@ -1,0 +1,6 @@
+{
+  "name": "ai-3d-real-estate",
+  "private": true,
+  "workspaces": ["apps/web", "packages/*"],
+  "scripts": {"dev:web": "npm --workspace apps/web run dev","build:web": "npm --workspace apps/web run build","typecheck:web": "npm --workspace apps/web run typecheck","test:api": "cd apps/api && pytest","test:e2e": "npm --workspace apps/web run test:e2e"}
+}

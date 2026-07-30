@@ -1,0 +1,3 @@
+import { NextResponse } from "next/server";
+import { API_URL } from "@/lib/api";
+export async function POST(request:Request){const payload=await request.json();const response=await fetch(`${API_URL}/auth/register`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload),cache:"no-store"});const data=await response.json();if(!response.ok)return NextResponse.json(data,{status:response.status});const out=NextResponse.json({user:data.user});out.cookies.set("nestora_token",data.access_token,{httpOnly:true,sameSite:"lax",secure:process.env.NODE_ENV==="production",maxAge:data.expires_in,path:"/"});return out;}

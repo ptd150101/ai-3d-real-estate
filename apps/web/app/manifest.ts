@@ -1,0 +1,1 @@
+import type{MetadataRoute}from'next';export default function manifest():MetadataRoute.Manifest{return{name:'Nestora Real Estate',short_name:'Nestora',description:'Bất động sản 3D và trợ lý AI',start_url:'/',display:'standalone',background_color:'#ffffff',theme_color:'#146047',icons:[{src:'/icon.svg',sizes:'any',type:'image/svg+xml'}]}}
