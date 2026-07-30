@@ -1,0 +1,3 @@
+import type { NextConfig } from "next";
+const nextConfig: NextConfig = {output: "standalone",images: {remotePatterns: [{ protocol: "https", hostname: "images.unsplash.com" },{ protocol: "http", hostname: "localhost" },{ protocol: "http", hostname: "api" }]},experimental: { optimizePackageImports: ["@react-three/drei"] },async headers() {return [{source: "/(.*)",headers: [{ key: "X-Content-Type-Options", value: "nosniff" },{ key: "X-Frame-Options", value: "DENY" },{ key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },{ key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=(self)" }]}];}};
+export default nextConfig;

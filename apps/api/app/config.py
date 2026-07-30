@@ -1,0 +1,60 @@
+from __future__ import annotations
+
+from functools import lru_cache
+from pathlib import Path
+from pydantic import BaseModel
+
+
+class Settings(BaseModel):
+    app_name: str = "Nestora API"
+    environment: str = "development"
+    api_prefix: str = "/api/v1"
+    secret_key: str = "change-me-in-production"
+    access_token_minutes: int = 60 * 24
+    database_url: str = "sqlite:///./nestora.db"
+    redis_url: str = "redis://redis:6379/0"
+    cors_origins: str = "http://localhost:3000"
+    storage_backend: str = "local"
+    storage_root: str = "./storage"
+    public_base_url: str = "http://localhost:8000"
+    s3_endpoint: str = "http://minio:9000"
+    s3_access_key: str = "local-access-key"
+    s3_secret_key: str = "local-secret-key-change-me"
+    s3_bucket: str = "nestora"
+    s3_public_url: str = "http://localhost:9000"
+    llm_base_url: str | None = None
+    llm_api_key: str | None = None
+    llm_model: str = "gpt-4.1-mini"
+    embedding_model: str = "text-embedding-3-small"
+    enable_llm: bool = False
+    enable_ar: bool = False
+    rate_limit_per_minute: int = 60
+    log_level: str = "INFO"
+
+    @property
+    def cors_origin_list(self) -> list[str]:
+        return [x.strip() for x in self.cors_origins.split(",") if x.strip()]
+
+    @property
+    def storage_path(self) -> Path:
+        return Path(self.storage_root).resolve()
+
+
+@lru_cache
+def get_settings() -> Settings:
+    import os
+
+    values: dict[str, object] = {}
+    for field in Settings.model_fields:
+        env_key = field.upper()
+        if env_key not in os.environ:
+            continue
+        raw = os.environ[env_key]
+        annotation = Settings.model_fields[field].annotation
+        if annotation is bool or "bool" in str(annotation):
+            values[field] = raw.lower() in {"1", "true", "yes", "on"}
+        elif annotation is int:
+            values[field] = int(raw)
+        else:
+            values[field] = raw
+    return Settings(**values)

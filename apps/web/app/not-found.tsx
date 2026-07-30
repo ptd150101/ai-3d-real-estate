@@ -1,0 +1,1 @@
+import Link from "next/link";export default function NotFound(){return <div className="container section empty"><h1 style={{fontSize:'3rem'}}>Không tìm thấy trang</h1><p>Nội dung có thể đã được di chuyển hoặc tin đăng đã hết hạn.</p><Link className="btn btn-primary" href="/properties">Quay lại tìm nhà</Link></div>}

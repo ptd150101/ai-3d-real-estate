@@ -1,0 +1,3 @@
+"use client";
+import { useState } from "react";import { useRouter } from "next/navigation";
+export function StatusSelect({kind,id,value,options}:{kind:'appointments'|'leads';id:string;value:string;options:string[]}){const router=useRouter();const[state,setState]=useState(value);async function change(next:string){setState(next);const response=await fetch(`/api/backend/admin/${kind}/${id}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({status:next})});if(response.ok)router.refresh();else setState(value)}return <select className="select" value={state} onChange={(e)=>void change(e.target.value)}>{options.map((x)=><option key={x}>{x}</option>)}</select>}

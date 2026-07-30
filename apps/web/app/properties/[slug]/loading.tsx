@@ -1,0 +1,1 @@
+export default function Loading(){return <div className="container section loading"><div className="stack" style={{width:'100%'}}><div className="skeleton" style={{height:40,width:'60%'}}/><div className="skeleton" style={{height:560}}/></div></div>}

@@ -1,0 +1,1 @@
+import{PropertyForm}from'@/components/admin/PropertyForm';export default function Page(){return <div className="stack"><div><span className="eyebrow">Create listing</span><h1 style={{fontSize:'2.7rem'}}>Đăng bất động sản mới</h1></div><PropertyForm/></div>}

@@ -1,0 +1,3 @@
+import type { MetadataRoute } from "next";
+import { getProperties } from "@/lib/api";
+export default async function sitemap():Promise<MetadataRoute.Sitemap>{const base=process.env.NEXT_PUBLIC_SITE_URL||'http://localhost:3000';let properties:Awaited<ReturnType<typeof getProperties>>['items']=[];try{properties=(await getProperties('page_size=48')).items}catch{}return[{url:base,lastModified:new Date(),changeFrequency:'daily',priority:1},{url:`${base}/properties`,lastModified:new Date(),changeFrequency:'hourly',priority:.9},{url:`${base}/compare`,lastModified:new Date(),changeFrequency:'weekly',priority:.5},...properties.map((p)=>({url:`${base}/properties/${p.slug}`,lastModified:new Date(p.updated_at),changeFrequency:'daily' as const,priority:.8}))]}

@@ -1,0 +1,2 @@
+import { NextResponse } from "next/server";import { cookies } from "next/headers";import { API_URL } from "@/lib/api";
+export async function GET(){const token=(await cookies()).get("nestora_token")?.value;if(!token)return NextResponse.json({detail:"Unauthenticated"},{status:401});const response=await fetch(`${API_URL}/auth/me`,{headers:{Authorization:`Bearer ${token}`},cache:"no-store"});return new NextResponse(await response.text(),{status:response.status,headers:{"Content-Type":"application/json"}})}
