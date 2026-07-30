@@ -13,30 +13,27 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
-        with:
-          python-version: "3.13"
+        with: { python-version: "3.13" }
       - run: pip install -r requirements.txt
       - run: python -m compileall -q app
       - run: pytest --cov=app --cov-report=term-missing
       - run: DATABASE_URL=sqlite:///./migration-test.db SEED_ADMIN_PASSWORD=test-admin-password SEED_AGENT_PASSWORD=test-agent-password SEED_BUYER_PASSWORD=test-buyer-password alembic upgrade head
       - run: python ../../scripts/generate_openapi.py
       - uses: actions/upload-artifact@v4
-        with:
-          name: openapi
-          path: packages/contracts/openapi.json
+        with: { name: openapi, path: packages/contracts/openapi.json }
 
   web:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
-        with:
-          node-version: "22"
+        with: { node-version: "22" }
       - run: npm install
       - run: npm --workspace apps/web run typecheck
       - run: npm --workspace apps/web run build
         env:
           NEXT_PUBLIC_API_URL: http://localhost:8000/api/v1
+          NEXT_PUBLIC_API_ORIGIN: http://localhost:8000
           NEXT_PUBLIC_SITE_URL: http://localhost:3000
 
   compose:
@@ -53,12 +50,11 @@ jobs:
 
   e2e:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 35
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
-        with:
-          node-version: "22"
+        with: { node-version: "22" }
       - run: cp .env.example .env
       - run: |
           echo 'SECRET_KEY=ci-e2e-secret-key-with-more-than-thirty-two-chars' >> .env
@@ -68,17 +64,17 @@ jobs:
           echo 'SEED_ADMIN_PASSWORD=ci-e2e-admin-password' >> .env
           echo 'SEED_AGENT_PASSWORD=ci-e2e-agent-password' >> .env
           echo 'SEED_BUYER_PASSWORD=ci-e2e-buyer-password' >> .env
-      - run: docker compose up -d --build postgres redis minio minio-init migrate api web
+      - run: docker compose up -d --build postgres redis minio minio-init migrate api worker web
       - name: Wait for full stack
         run: |
-          for attempt in $(seq 1 80); do
+          for attempt in $(seq 1 100); do
             if curl -fsS http://localhost:8000/health >/dev/null && curl -fsS http://localhost:3000 >/dev/null; then
               exit 0
             fi
             sleep 3
           done
           docker compose ps
-          docker compose logs --tail=300
+          docker compose logs --tail=400
           exit 1
       - run: bash scripts/smoke.sh
       - run: npm install
@@ -87,6 +83,6 @@ jobs:
         env:
           PLAYWRIGHT_BASE_URL: http://localhost:3000
       - if: always()
-        run: docker compose logs --tail=300
+        run: docker compose logs --tail=400
       - if: always()
         run: docker compose down -v
