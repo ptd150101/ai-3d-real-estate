@@ -6,7 +6,7 @@ export const API_URL = process.env.API_INTERNAL_URL || process.env.NEXT_PUBLIC_A
 export async function apiFetch<T>(path: string, init?: RequestInit, withAuth = false): Promise<T> {
   const headers = new Headers(init?.headers); headers.set("Accept", "application/json");
   if (init?.body && !headers.has("Content-Type")) headers.set("Content-Type", "application/json");
-  if (withAuth) {const store = await cookies();const token = store.get("nestora_token")?.value;if (token) headers.set("Authorization", `Bearer ${token}`);}
+  if (withAuth) {const store = await cookies();const token = store.get("nestora_token")?.value;const organizationId=store.get("nestora_org")?.value;if (token) headers.set("Authorization", `Bearer ${token}`);if(organizationId) headers.set("X-Organization-ID",organizationId);}
   const response = await fetch(`${API_URL}${path}`, { ...init, headers, next: init?.cache === "no-store" ? undefined : { revalidate: 60 } });
   if (!response.ok) throw new Error(`API ${response.status}: ${await response.text()}`);
   if (response.status === 204) return undefined as T;

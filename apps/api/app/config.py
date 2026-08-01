@@ -44,6 +44,13 @@ class Settings(BaseModel):
     document_signing_ttl_minutes: int = 15
     analytics_retention_days: int = 365
     worker_poll_seconds: int = 2
+    payment_webhook_secret: str = ""
+    vnpay_webhook_secret: str = ""
+    stripe_webhook_secret: str = ""
+    signature_webhook_secret: str = ""
+    mobile_refresh_days: int = 30
+    gpu_worker_capabilities: str = "mesh,gaussian_splat,glb"
+    gpu_hourly_cost: float = 0.0
 
     @property
     def cors_origin_list(self) -> list[str]:
@@ -66,5 +73,6 @@ def get_settings() -> Settings:
         annotation = Settings.model_fields[field].annotation
         if annotation is bool or "bool" in str(annotation): values[field] = raw.lower() in {"1", "true", "yes", "on"}
         elif annotation is int: values[field] = int(raw)
+        elif annotation is float: values[field] = float(raw)
         else: values[field] = raw
     return Settings(**values)

@@ -16,6 +16,7 @@ from .logging_config import configure_logging
 from .routers import (
     admin, analytics, auth, calendar, chat, crm, engagement, experience, health, jobs,
     knowledge, legal, messaging, notifications, projects_agents, properties, reviews, uploads,
+    p2_organizations, p2_payments, p2_contracts, p2_intelligence, p2_spatial, p2_mobile, p2_mlops,
 )
 from .seed import seed_database
 from .services.rate_limit import SlidingWindowRateLimiter
@@ -37,7 +38,7 @@ async def lifespan(_: FastAPI):
     await messaging_manager.stop()
 
 
-app = FastAPI(title=settings.app_name, version="1.1.0", description="AI-assisted real-estate marketplace with P1 notifications, realtime messaging, CRM, panorama, legal workflow and analytics.", lifespan=lifespan)
+app = FastAPI(title=settings.app_name, version="2.0.0", description="Multi-agency AI and immersive real-estate marketplace with payments, contracts, valuation, recommendations, reconstruction, AR/VR and mobile.", lifespan=lifespan)
 app.add_middleware(CORSMiddleware, allow_origins=settings.cors_origin_list, allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 
 
@@ -67,7 +68,8 @@ for router in [
     auth.router, properties.router, projects_agents.router, engagement.router, chat.router,
     knowledge.router, uploads.router, jobs.router, admin.router, notifications.router,
     calendar.router, reviews.router, messaging.router, crm.router, experience.router,
-    legal.router, analytics.router,
+    legal.router, analytics.router, p2_organizations.router, p2_payments.router,
+    p2_contracts.router, p2_intelligence.router, p2_spatial.router, p2_mobile.router, p2_mlops.router,
 ]:
     app.include_router(router, prefix=settings.api_prefix)
 app.include_router(health.router)
@@ -75,4 +77,4 @@ app.mount("/storage", StaticFiles(directory=str(settings.storage_path), check_di
 
 
 @app.get("/")
-def root(): return {"name": settings.app_name, "version": "1.1.0", "docs": "/docs", "health": "/health"}
+def root(): return {"name": settings.app_name, "version": "2.0.0", "docs": "/docs", "health": "/health"}

@@ -1,0 +1,48 @@
+{
+  "expo": {
+    "name": "Nestora",
+    "slug": "nestora-mobile",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "scheme": "nestora",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      [
+        "expo-notifications",
+        {
+          "defaultChannel": "general"
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Cho phép Nestora chọn ảnh để tạo mô hình 3D.",
+          "cameraPermission": "Cho phép Nestora chụp ảnh bất động sản."
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.nestora.mobile"
+    },
+    "android": {
+      "package": "com.nestora.mobile",
+      "permissions": [
+        "CAMERA",
+        "POST_NOTIFICATIONS"
+      ]
+    },
+    "extra": {
+      "router": {
+        "origin": false
+      },
+      "apiUrl": "http://10.0.2.2:8000/api/v1"
+    }
+  }
+}

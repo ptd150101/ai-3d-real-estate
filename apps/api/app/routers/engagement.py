@@ -23,7 +23,7 @@ router = APIRouter(tags=["engagement"])
 def create_appointment(payload: AppointmentCreate, request: Request, db: Session = Depends(get_db), user: User | None = Depends(get_current_user_optional)):
     property_obj = db.get(Property, payload.property_id)
     if not property_obj: raise HTTPException(status_code=404, detail="Property not found")
-    item = Appointment(**payload.model_dump(), user_id=user.id if user else None, agent_id=property_obj.agent_id)
+    item = Appointment(**payload.model_dump(), user_id=user.id if user else None, agent_id=property_obj.agent_id, organization_id=property_obj.organization_id)
     db.add(item); db.flush()
     write_audit(db, actor=user, action="appointment.create", entity_type="appointment", entity_id=item.id, after=payload.model_dump(mode="json"), ip_address=client_ip(request))
     if user:
@@ -55,7 +55,8 @@ def create_lead(payload: LeadCreate, request: Request, db: Session = Depends(get
         item.message = payload.message or item.message
         item.email = payload.email or item.email
     else:
-        item = Lead(**payload.model_dump(), user_id=user.id if user else None)
+        property_obj = db.get(Property, payload.property_id) if payload.property_id else None
+        item = Lead(**payload.model_dump(), user_id=user.id if user else None, organization_id=property_obj.organization_id if property_obj else None)
         db.add(item); db.flush()
     route_lead(db, item)
     write_audit(db, actor=user, action="lead.create", entity_type="lead", entity_id=item.id, after=payload.model_dump(mode="json"), ip_address=client_ip(request))

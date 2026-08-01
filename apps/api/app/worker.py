@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import os
 import time
 from datetime import date
 from sqlalchemy import select
@@ -17,6 +18,10 @@ from .services.jobs_p1 import claim_job, complete_job, fail_job
 from .services.notification import deliver
 from .services.reminders import send_appointment_reminders
 from .services.saved_search import match_all_saved_searches, match_saved_search
+from .services.p2_contracts import expire_and_remind
+from .services.p2_payments import expire_orders
+from .services.p2_spatial import process_reconstruction
+from .services.p2_tenant import create_tenant_export, resolve_org_context
 
 logger = logging.getLogger("nestora.worker")
 
@@ -41,6 +46,9 @@ def process_durable(db, job) -> dict:
     if job.job_type == "analytics_aggregation": return aggregate_day(db, date.fromisoformat(p["date"]))
     if job.job_type == "panorama_validation": return {"status": "validated", "scene_id": p.get("scene_id")}
     if job.job_type == "legal_watermark": return {"status": "ready", "grant_id": p.get("grant_id")}
+    if job.job_type == "p2.reconstruction": return process_reconstruction(db, p["job_id"])
+    if job.job_type == "p2.reservation_expiry": return {"expired": expire_orders(db)}
+    if job.job_type == "p2.contract_maintenance": return expire_and_remind(db)
     return {"status": "ignored"}
 
 
@@ -48,6 +56,8 @@ def schedule_periodic(db) -> None:
     from datetime import datetime, timezone
     now=datetime.now(timezone.utc); minute=now.strftime("%Y%m%d%H%M"); hour=now.strftime("%Y%m%d%H")
     enqueue_job(db,"appointment_reminder",{},idempotency_key=f"periodic:reminder:{minute}")
+    enqueue_job(db,"p2.reservation_expiry",{},idempotency_key=f"periodic:p2-reservation-expiry:{minute}")
+    enqueue_job(db,"p2.contract_maintenance",{},idempotency_key=f"periodic:p2-contracts:{minute}")
     if now.minute % 5 == 0: enqueue_job(db,"saved_search_matching",{},idempotency_key=f"periodic:saved-search:{minute}")
     if now.minute == 0: enqueue_job(db,"analytics_aggregation",{"date":now.date().isoformat()},idempotency_key=f"periodic:analytics:{hour}")
     db.commit()
@@ -55,6 +65,11 @@ def schedule_periodic(db) -> None:
 
 def run_forever(poll_seconds: float | None = None) -> None:
     poll_seconds = poll_seconds or get_settings().worker_poll_seconds
+    capabilities = {x.strip() for x in os.getenv("WORKER_CAPABILITIES", "cpu").split(",") if x.strip()}
+    cpu_jobs = {"notification_delivery", "saved_search_matching", "appointment_reminder", "calendar_sync", "crm_sync", "brochure_render", "analytics_aggregation", "panorama_validation", "legal_watermark", "p2.reservation_expiry", "p2.contract_maintenance"}
+    allowed_jobs = set(cpu_jobs)
+    if "gpu" in capabilities:
+        allowed_jobs.add("p2.reconstruction")
     last_periodic: str | None = None
     while True:
         with SessionLocal() as db:
@@ -62,7 +77,7 @@ def run_forever(poll_seconds: float | None = None) -> None:
             current_minute=datetime.now(timezone.utc).strftime("%Y%m%d%H%M")
             if current_minute != last_periodic:
                 schedule_periodic(db); last_periodic=current_minute
-            durable = claim_job(db)
+            durable = claim_job(db, allowed_job_types=allowed_jobs)
             if durable:
                 try:
                     result = process_durable(db, durable); complete_job(db, durable, result)

@@ -164,3 +164,6 @@ th { background: var(--panel); font-size: .85rem; }
   .metrics { grid-template-columns: 1fr; }
   .admin-main { padding: 20px 12px; }
 }
+
+/* P2 marketplace and operations surfaces */
+.org-switcher select{max-width:180px;border:1px solid var(--border);border-radius:999px;background:var(--surface);padding:.55rem .8rem;color:var(--text);font:inherit}.p2-console .code-block{overflow:auto;max-height:420px;white-space:pre-wrap;font-size:.82rem}.data-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:1rem}.split-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:1rem}.form-grid{display:grid;gap:.85rem}.form-grid label{display:grid;gap:.35rem}.form-grid input,.form-grid select{width:100%;padding:.75rem;border:1px solid var(--border);border-radius:.6rem;background:var(--surface)}.action-card{display:flex;flex-direction:column;gap:.45rem;text-align:left;color:inherit}.button-row{display:flex;flex-wrap:wrap;gap:.75rem}.status-banner,.error-banner{padding:.85rem 1rem;border-radius:.65rem;background:var(--surface-subtle)}.error-banner{color:#a62424}.muted{color:var(--muted)}
