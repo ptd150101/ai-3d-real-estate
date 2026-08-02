@@ -2,10 +2,19 @@
 
 Revision ID: 0002_p1_platform
 Revises: 0001_initial
+
+Only the explicit P1 table set is created. This prevents later P2 models from leaking into
+an earlier migration while preserving the already-validated P1 ORM definitions.
 """
+from __future__ import annotations
+
+import sqlalchemy as sa
 from alembic import op
+from sqlalchemy import inspect
+from sqlalchemy.sql.schema import CheckConstraint, UniqueConstraint
+
 from app.database import Base
-from app import models  # noqa: F401
+from app import models  # noqa: F401 -- populate metadata
 
 revision = "0002_p1_platform"
 down_revision = "0001_initial"
@@ -28,13 +37,36 @@ P1_TABLES = [
 ]
 
 
-def upgrade():
-    Base.metadata.create_all(bind=op.get_bind(), checkfirst=True)
+def _copy_table(name: str) -> None:
+    source = Base.metadata.tables[name]
+    columns = [column._copy() for column in source.columns]
+    constraints: list[sa.Constraint] = []
+    for constraint in source.constraints:
+        if isinstance(constraint, UniqueConstraint):
+            constraints.append(
+                sa.UniqueConstraint(*(column.name for column in constraint.columns), name=constraint.name)
+            )
+        elif isinstance(constraint, CheckConstraint):
+            constraints.append(sa.CheckConstraint(str(constraint.sqltext), name=constraint.name))
+
+    op.create_table(name, *columns, *constraints)
+    for index in sorted(source.indexes, key=lambda item: item.name or ""):
+        names = [getattr(expression, "name", None) for expression in index.expressions]
+        if index.name and all(names):
+            op.create_index(index.name, name, names, unique=index.unique)
 
 
-def downgrade():
+def upgrade() -> None:
     bind = op.get_bind()
+    existing = set(inspect(bind).get_table_names())
+    for name in P1_TABLES:
+        if name not in existing:
+            _copy_table(name)
+
+
+def downgrade() -> None:
+    bind = op.get_bind()
+    existing = set(inspect(bind).get_table_names())
     for name in reversed(P1_TABLES):
-        table = Base.metadata.tables.get(name)
-        if table is not None:
-            table.drop(bind=bind, checkfirst=True)
+        if name in existing:
+            op.drop_table(name)
