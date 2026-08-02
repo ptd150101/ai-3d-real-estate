@@ -52,8 +52,11 @@ def _copy_table(name: str) -> None:
     op.create_table(name, *columns, *constraints)
     for index in sorted(source.indexes, key=lambda item: item.name or ""):
         names = [getattr(expression, "name", None) for expression in index.expressions]
-        if index.name and all(names):
-            op.create_index(index.name, name, names, unique=index.unique)
+        if not (index.name and all(names)):
+            continue
+        if len(names) == 1 and source.columns[names[0]].index:
+            continue
+        op.create_index(index.name, name, names, unique=index.unique)
 
 
 def upgrade() -> None:
