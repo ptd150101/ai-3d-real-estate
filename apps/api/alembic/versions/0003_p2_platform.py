@@ -166,6 +166,10 @@ def downgrade() -> None:
         if column not in existing:
             continue
         if bind.dialect.name == "sqlite":
+            index_name = f"ix_{table}_{column}"
+            index_names = {item["name"] for item in inspect(bind).get_indexes(table)}
+            if index_name in index_names:
+                op.drop_index(index_name, table_name=table)
             with op.batch_alter_table(table, recreate="always") as batch:
                 batch.drop_column(column)
         else:
