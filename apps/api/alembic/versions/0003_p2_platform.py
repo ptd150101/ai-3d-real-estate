@@ -116,8 +116,11 @@ def _copy_table(name: str) -> None:
     op.create_table(name, *columns, *constraints)
     for index in sorted(source.indexes, key=lambda item: item.name or ""):
         names = [getattr(expression, "name", None) for expression in index.expressions]
-        if index.name and all(names):
-            op.create_index(index.name, name, names, unique=index.unique)
+        if not (index.name and all(names)):
+            continue
+        if len(names) == 1 and source.columns[names[0]].index:
+            continue
+        op.create_index(index.name, name, names, unique=index.unique)
 
 
 def upgrade() -> None:
@@ -126,38 +129,47 @@ def upgrade() -> None:
     for name in P2_SCHEMA:
         if name not in existing_tables:
             _copy_table(name)
-    inspector = inspect(bind)
     for table, column in CORE_COLUMNS.items():
+        inspector = inspect(bind)
         existing = {item["name"] for item in inspector.get_columns(table)}
-        if column in existing:
-            continue
-        op.add_column(table, sa.Column(column, sa.String(36), nullable=True))
-        op.create_index(f"ix_{table}_{column}", table, [column], unique=False)
+        if column not in existing:
+            op.add_column(table, sa.Column(column, sa.String(36), nullable=True))
+
+        inspector = inspect(bind)
+        index_name = f"ix_{table}_{column}"
+        index_names = {item["name"] for item in inspector.get_indexes(table)}
+        if index_name not in index_names:
+            op.create_index(index_name, table, [column], unique=False)
+
         if bind.dialect.name != "sqlite":
-            op.create_foreign_key(
-                f"fk_{table}_{column}_organizations",
-                table,
-                "organizations",
-                [column],
-                ["id"],
-                ondelete="SET NULL",
+            foreign_keys = inspector.get_foreign_keys(table)
+            has_org_fk = any(
+                item.get("constrained_columns") == [column]
+                and item.get("referred_table") == "organizations"
+                for item in foreign_keys
             )
+            if not has_org_fk:
+                op.create_foreign_key(
+                    f"fk_{table}_{column}_organizations",
+                    table,
+                    "organizations",
+                    [column],
+                    ["id"],
+                    ondelete="SET NULL",
+                )
 
 
 def downgrade() -> None:
     bind = op.get_bind()
-    inspector = inspect(bind)
     for table, column in reversed(tuple(CORE_COLUMNS.items())):
-        existing = {item["name"] for item in inspector.get_columns(table)}
+        existing = {item["name"] for item in inspect(bind).get_columns(table)}
         if column not in existing:
             continue
-        if bind.dialect.name != "sqlite":
-            op.drop_constraint(f"fk_{table}_{column}_organizations", table, type_="foreignkey")
-        op.drop_index(f"ix_{table}_{column}", table_name=table)
         if bind.dialect.name == "sqlite":
             with op.batch_alter_table(table, recreate="always") as batch:
                 batch.drop_column(column)
         else:
+            # PostgreSQL drops dependent indexes and foreign-key constraints with the column.
             op.drop_column(table, column)
     for name in reversed(tuple(P2_SCHEMA)):
         if name in set(inspect(bind).get_table_names()):
