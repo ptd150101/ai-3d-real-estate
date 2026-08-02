@@ -41,8 +41,8 @@ jobs:
       - run: bandit -q -r apps/api/app -x apps/api/tests -ll
       - name: Reject dynamic metadata migrations
         run: |
-          if grep -R "metadata.create_all" apps/api/alembic/versions; then
-            echo "Historical migrations must use frozen Alembic operations" >&2
+          if grep -R "metadata.create_all\|metadata.drop_all" apps/api/alembic/versions; then
+            echo "Historical migrations must use explicit table operations" >&2
             exit 1
           fi
 
@@ -75,7 +75,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: aquasecurity/trivy-action@0.30.0
+      - uses: aquasecurity/trivy-action@v0.36.0
         with:
           scan-type: fs
           scan-ref: .
