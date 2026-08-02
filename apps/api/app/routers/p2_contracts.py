@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+import json
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, Response
+from fastapi import APIRouter, Depends, Header, HTTPException, Request, Response
 from fastapi.responses import RedirectResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -23,7 +24,9 @@ from ..p2_dependencies import get_org_context
 from ..p2_schemas import ContractEnvelopeCreate, ContractSignCreate, ContractTemplateCreate, LegalPolicyCreate
 from ..services.p2_contracts import (
     create_envelope,
+    create_provider_signing_view,
     issue_signing_token,
+    process_provider_webhook,
     record_signature,
     verify_signing_token,
 )
@@ -50,10 +53,7 @@ def policy(
         )
     )
     if not item:
-        item = LegalDocumentPolicy(
-            document_type=payload.document_type,
-            jurisdiction=payload.jurisdiction,
-        )
+        item = LegalDocumentPolicy(document_type=payload.document_type, jurisdiction=payload.jurisdiction)
         db.add(item)
     item.approved = payload.approved
     item.notes = payload.notes
@@ -82,19 +82,11 @@ def template(
     )
     db.add(item)
     db.commit()
-    return {
-        "id": item.id,
-        "name": item.name,
-        "document_type": item.document_type,
-        "version": item.version,
-    }
+    return {"id": item.id, "name": item.name, "document_type": item.document_type, "version": item.version}
 
 
 @router.get("/templates")
-def templates(
-    ctx: OrgContext = Depends(get_org_context),
-    db: Session = Depends(get_db),
-):
+def templates(ctx: OrgContext = Depends(get_org_context), db: Session = Depends(get_db)):
     return [
         {
             "id": item.id,
@@ -146,6 +138,7 @@ def envelope(
     return {
         "id": item.id,
         "status": item.status,
+        "provider": item.provider,
         "document_url": _document_url(item.id),
         "checksum": item.document_checksum,
         "expires_at": item.expires_at,
@@ -154,10 +147,7 @@ def envelope(
 
 
 @router.get("/envelopes")
-def envelopes(
-    ctx: OrgContext = Depends(get_org_context),
-    db: Session = Depends(get_db),
-):
+def envelopes(ctx: OrgContext = Depends(get_org_context), db: Session = Depends(get_db)):
     return [
         {
             "id": item.id,
@@ -193,6 +183,8 @@ def create_participant_signing_token(
         or participant.envelope_id != envelope.id
     ):
         raise HTTPException(status_code=404, detail="Envelope or participant not found")
+    if envelope.provider != "local":
+        raise HTTPException(status_code=409, detail="External envelope uses a provider signing view")
     if participant.status == "signed":
         raise HTTPException(status_code=409, detail="Participant has already signed")
     if envelope.status != "sent":
@@ -204,6 +196,24 @@ def create_participant_signing_token(
         "participant_id": participant.id,
         "envelope_id": envelope.id,
     }
+
+
+@router.post("/envelopes/{envelope_id}/participants/{participant_id}/provider-view")
+def provider_signing_view(
+    envelope_id: str,
+    participant_id: str,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    envelope = db.get(ContractEnvelope, envelope_id)
+    participant = db.get(ContractParticipant, participant_id)
+    if not envelope or not participant or participant.envelope_id != envelope.id:
+        raise HTTPException(status_code=404, detail="Envelope or participant not found")
+    if participant.user_id and participant.user_id != user.id:
+        raise HTTPException(status_code=403, detail="Signer identity does not match participant")
+    if not participant.user_id and participant.email.lower() != user.email.lower():
+        raise HTTPException(status_code=403, detail="Signer email does not match participant")
+    return {"url": create_provider_signing_view(db, envelope=envelope, participant=participant)}
 
 
 @router.post("/envelopes/{envelope_id}/sign")
@@ -219,6 +229,8 @@ def sign(
     participant = db.get(ContractParticipant, payload.participant_id)
     if not envelope or not participant or participant.envelope_id != envelope.id:
         raise HTTPException(status_code=404, detail="Envelope or participant not found")
+    if envelope.provider != "local":
+        raise HTTPException(status_code=409, detail="External envelopes must be signed at the provider")
 
     if payload.signing_token:
         claims = verify_signing_token(
@@ -255,6 +267,31 @@ def sign(
     return {"id": item.id, "status": item.status, "completed_at": item.completed_at}
 
 
+@router.post("/webhooks/{provider}")
+async def signature_webhook(
+    provider: str,
+    request: Request,
+    x_docusign_signature_1: str = Header(default="", alias="X-DocuSign-Signature-1"),
+    x_signature: str = Header(default="", alias="X-Signature"),
+    db: Session = Depends(get_db),
+):
+    raw_body = await request.body()
+    try:
+        payload = json.loads(raw_body or b"{}")
+    except json.JSONDecodeError as exc:
+        raise HTTPException(status_code=400, detail="Invalid signature webhook JSON") from exc
+    if not isinstance(payload, dict):
+        raise HTTPException(status_code=400, detail="Signature webhook body must be an object")
+    signature = x_docusign_signature_1 or x_signature
+    return process_provider_webhook(
+        db,
+        provider=provider.lower(),
+        raw_body=raw_body,
+        payload=payload,
+        signature=signature,
+    )
+
+
 @router.get("/envelopes/{envelope_id}/document")
 def download_document(
     envelope_id: str,
@@ -264,7 +301,6 @@ def download_document(
     envelope = db.get(ContractEnvelope, envelope_id)
     if not envelope or not envelope.document_url:
         raise HTTPException(status_code=404, detail="Document not found")
-
     member = db.scalar(
         select(OrganizationMember).where(
             OrganizationMember.organization_id == envelope.organization_id,
@@ -286,7 +322,6 @@ def download_document(
     )
     if not member and not participant and user.role != "admin":
         raise HTTPException(status_code=404, detail="Document not found")
-
     signed_url = presign_private_url(envelope.document_url)
     if signed_url:
         return RedirectResponse(signed_url, status_code=307, headers={"cache-control": "private, no-store"})
