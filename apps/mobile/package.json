@@ -8,7 +8,11 @@
     "android": "expo start --android",
     "typecheck": "tsc --noEmit",
     "doctor": "expo install --check",
-    "export:android": "expo export --platform android --output-dir dist"
+    "export:android": "expo export --platform android --output-dir dist",
+    "build:android": "npx eas-cli build --platform android --profile production --non-interactive",
+    "build:ios": "npx eas-cli build --platform ios --profile production --non-interactive",
+    "submit:android": "npx eas-cli submit --platform android --profile production --non-interactive",
+    "submit:ios": "npx eas-cli submit --platform ios --profile production --non-interactive"
   },
   "dependencies": {
     "@react-native-async-storage/async-storage": "2.2.0",
@@ -29,6 +33,7 @@
   },
   "devDependencies": {
     "@types/react": "~19.2.0",
-    "typescript": "~6.0.3"
+    "typescript": "~6.0.3",
+    "@types/node": "22.15.30"
   }
 }
