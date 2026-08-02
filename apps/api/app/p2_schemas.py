@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from datetime import datetime
 from typing import Any, Literal
+
 from pydantic import BaseModel, EmailStr, Field
 
 
@@ -68,7 +68,7 @@ class ContractTemplateCreate(BaseModel):
 class ContractEnvelopeCreate(BaseModel):
     template_id: str
     reservation_order_id: str | None = None
-    provider: Literal["local", "external"] = "local"
+    provider: Literal["local", "external", "docusign"] = "local"
     data: dict[str, Any] = Field(default_factory=dict)
     participants: list[dict[str, Any]] = Field(min_length=1)
 
@@ -76,7 +76,7 @@ class ContractEnvelopeCreate(BaseModel):
 class ContractSignCreate(BaseModel):
     participant_id: str
     signing_token: str | None = Field(default=None, min_length=32)
-    provider_event_id: str | None = None  # backward-compatible; ignored for local signing
+    provider_event_id: str | None = None
     consent: bool = True
     metadata: dict[str, Any] = Field(default_factory=dict)
 
@@ -162,7 +162,7 @@ class VRSessionCreate(BaseModel):
 class MLArtifactCreate(BaseModel):
     kind: str
     uri: str
-    sha256: str
+    sha256: str = Field(min_length=32, max_length=128)
     metadata: dict[str, Any] = Field(default_factory=dict)
 
 
@@ -206,8 +206,8 @@ class MobileLogoutCreate(BaseModel):
 class MobileDeviceCreate(BaseModel):
     device_id: str
     platform: Literal["ios", "android", "web"]
-    push_token: str | None = None
-    app_version: str | None = None
+    push_token: str | None = Field(default=None, max_length=512)
+    app_version: str | None = Field(default=None, max_length=80)
 
 
 class MobileMutationCreate(BaseModel):
@@ -215,3 +215,10 @@ class MobileMutationCreate(BaseModel):
     client_mutation_id: str = Field(min_length=6, max_length=180)
     mutation_type: str
     payload: dict[str, Any] = Field(default_factory=dict)
+
+
+class MobilePushCreate(BaseModel):
+    user_ids: list[str] = Field(min_length=1, max_length=1000)
+    title: str = Field(min_length=1, max_length=120)
+    body: str = Field(min_length=1, max_length=500)
+    data: dict[str, Any] = Field(default_factory=dict)
