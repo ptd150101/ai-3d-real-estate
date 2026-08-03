@@ -1,0 +1,85 @@
+name: Security
+
+on:
+  pull_request:
+  push:
+    branches: [main, "agent/**"]
+  schedule:
+    - cron: "17 2 * * 1"
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  codeql:
+    name: CodeQL
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [python, javascript-typescript]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+      - uses: github/codeql-action/analyze@v3
+
+  python-security:
+    name: Python dependency and SAST scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: apps/api/requirements.txt
+      - run: pip install -r apps/api/requirements.txt pip-audit bandit
+      - run: pip-audit -r apps/api/requirements.txt --strict
+      - run: bandit -q -r apps/api/app -x apps/api/tests -ll
+      - name: Reject dynamic metadata migrations
+        run: |
+          if grep -R "metadata.create_all\|metadata.drop_all" apps/api/alembic/versions; then
+            echo "Historical migrations must use explicit table operations" >&2
+            exit 1
+          fi
+
+  javascript-security:
+    name: JavaScript dependency scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: npm install --prefix apps/web --ignore-scripts
+      - run: npm audit --prefix apps/web --audit-level=high
+      - run: npm install --prefix apps/mobile --ignore-scripts
+      - run: npm audit --prefix apps/mobile --audit-level=high
+
+  secrets:
+    name: Secret scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  filesystem:
+    name: Filesystem vulnerability scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: "1"
+          format: table

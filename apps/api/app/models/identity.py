@@ -19,6 +19,7 @@ class User(Base, TimestampMixin):
 class Agency(Base, TimestampMixin):
     __tablename__ = "agencies"
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    organization_id: Mapped[str | None] = mapped_column(ForeignKey("organizations.id", ondelete="SET NULL"), unique=True, index=True)
     name: Mapped[str] = mapped_column(String(200), unique=True)
     slug: Mapped[str] = mapped_column(String(220), unique=True, index=True)
     logo_url: Mapped[str | None] = mapped_column(String(1024))
@@ -28,6 +29,7 @@ class Agency(Base, TimestampMixin):
 class Agent(Base, TimestampMixin):
     __tablename__ = "agents"
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    organization_id: Mapped[str | None] = mapped_column(ForeignKey("organizations.id", ondelete="SET NULL"), index=True)
     user_id: Mapped[str | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), unique=True)
     agency_id: Mapped[str | None] = mapped_column(ForeignKey("agencies.id", ondelete="SET NULL"))
     display_name: Mapped[str] = mapped_column(String(160))
@@ -43,6 +45,7 @@ class Agent(Base, TimestampMixin):
 class Project(Base, TimestampMixin):
     __tablename__ = "projects"
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    organization_id: Mapped[str | None] = mapped_column(ForeignKey("organizations.id", ondelete="SET NULL"), index=True)
     name: Mapped[str] = mapped_column(String(220))
     slug: Mapped[str] = mapped_column(String(240), unique=True, index=True)
     developer: Mapped[str | None] = mapped_column(String(220))

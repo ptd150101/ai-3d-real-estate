@@ -51,7 +51,7 @@ def enqueue_job(
     return item
 
 
-def claim_job(db: Session, *, worker_id: str | None = None, lease_seconds: int = 90) -> DurableJob | None:
+def claim_job(db: Session, *, worker_id: str | None = None, lease_seconds: int = 90, allowed_job_types: set[str] | None = None) -> DurableJob | None:
     worker_id = worker_id or f"{socket.gethostname()}:{os.getpid()}"
     now = now_utc()
     stmt = (
@@ -64,6 +64,8 @@ def claim_job(db: Session, *, worker_id: str | None = None, lease_seconds: int =
         .order_by(DurableJob.priority.asc(), DurableJob.run_after.asc(), DurableJob.created_at.asc())
         .limit(1)
     )
+    if allowed_job_types is not None:
+        stmt = stmt.where(DurableJob.job_type.in_(allowed_job_types))
     if db.bind is not None and db.bind.dialect.name == "postgresql":
         stmt = stmt.with_for_update(skip_locked=True)
     item = db.scalar(stmt)

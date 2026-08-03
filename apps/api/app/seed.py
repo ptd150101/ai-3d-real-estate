@@ -9,10 +9,13 @@ from sqlalchemy.orm import Session
 from .models import Agency, Agent, KnowledgeDocument, NearbyPlace, Project, Property, PropertyDocument, PropertyFeature, PropertyFloor, PropertyHotspot, PropertyMedia, PropertyModel3D, User
 from .security import hash_password
 from .services.rag import index_document
+from .services.p2_tenant import ensure_default_tenant
 
 
 def seed_database(db: Session) -> None:
-    if db.scalar(select(User).limit(1)): return
+    if db.scalar(select(User).limit(1)):
+        ensure_default_tenant(db)
+        return
     admin_password = os.getenv("SEED_ADMIN_PASSWORD") or secrets.token_urlsafe(32)
     buyer_password = os.getenv("SEED_BUYER_PASSWORD") or secrets.token_urlsafe(32)
     agent_password = os.getenv("SEED_AGENT_PASSWORD") or secrets.token_urlsafe(32)
@@ -52,3 +55,4 @@ def seed_database(db: Session) -> None:
         doc = KnowledgeDocument(property_id=item.id, project_id=item.project_id, document_type="listing", title=f"Dữ liệu xác minh - {item.title}", source_url=f"/properties/{item.slug}", content=f"{item.title}. Giá {item.price} VND. Diện tích {item.area_m2} m². Có {item.bedrooms} phòng ngủ và {item.bathrooms} phòng tắm. Địa chỉ {item.address}, {item.district}, {item.city}. Pháp lý: {item.legal_status}. Mô tả: {item.description}", verified=item.is_verified)
         db.add(doc); db.flush(); index_document(db, doc)
     db.commit()
+    ensure_default_tenant(db)

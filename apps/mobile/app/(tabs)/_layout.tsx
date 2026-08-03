@@ -1,0 +1,2 @@
+import { Tabs } from "expo-router";
+export default function TabLayout(){return <Tabs screenOptions={{headerShown:false,tabBarActiveTintColor:"#1d5f4a"}}><Tabs.Screen name="index" options={{title:"Khám phá"}}/><Tabs.Screen name="map" options={{title:"Bản đồ"}}/><Tabs.Screen name="favorites" options={{title:"Đã lưu"}}/><Tabs.Screen name="capture" options={{title:"Capture"}}/><Tabs.Screen name="agent" options={{title:"Agent"}}/><Tabs.Screen name="settings" options={{title:"Cài đặt"}}/></Tabs>}

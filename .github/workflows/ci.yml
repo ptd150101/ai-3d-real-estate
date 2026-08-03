@@ -7,20 +7,81 @@ on:
 jobs:
   api:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: apps/api
+    defaults: { run: { working-directory: apps/api } }
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with: { python-version: "3.13" }
       - run: pip install -r requirements.txt
-      - run: python -m compileall -q app
+      - run: python -m compileall -q app alembic
       - run: pytest --cov=app --cov-report=term-missing
-      - run: DATABASE_URL=sqlite:///./migration-test.db SEED_ADMIN_PASSWORD=test-admin-password SEED_AGENT_PASSWORD=test-agent-password SEED_BUYER_PASSWORD=test-buyer-password alembic upgrade head
+      - name: Reversible SQLite migration cycle
+        env:
+          DATABASE_URL: sqlite:///./migration-cycle.db
+          SEED_ADMIN_PASSWORD: test-admin-password
+          SEED_AGENT_PASSWORD: test-agent-password
+          SEED_BUYER_PASSWORD: test-buyer-password
+        run: |
+          rm -f migration-cycle.db
+          alembic upgrade head
+          alembic downgrade 0002_p1_platform
+          alembic upgrade head
+          test "$(alembic current)" != ""
       - run: python ../../scripts/generate_openapi.py
       - uses: actions/upload-artifact@v4
         with: { name: openapi, path: packages/contracts/openapi.json }
+
+  postgres-migration:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.13" }
+      - run: pip install -r apps/api/requirements.txt
+      - run: docker build -t nestora-postgres-ci ./infra/postgres
+      - run: docker run -d --name p2-postgres -e POSTGRES_DB=nestora -e POSTGRES_USER=nestora -e POSTGRES_PASSWORD=nestora-pass -p 5432:5432 nestora-postgres-ci
+      - name: Wait for stable PostgreSQL
+        run: |
+          stable=0
+          for i in $(seq 1 60); do
+            if docker exec p2-postgres pg_isready -U nestora -d nestora >/dev/null \
+              && test "$(docker exec p2-postgres psql -U nestora -d nestora -Atqc 'select 1' 2>/dev/null | tr -d '\r')" = "1"; then
+              stable=$((stable + 1))
+              if test "$stable" -ge 3; then exit 0; fi
+            else
+              stable=0
+            fi
+            sleep 2
+          done
+          docker logs p2-postgres
+          exit 1
+      - name: Upgrade and reversible P2 migration
+        working-directory: apps/api
+        env:
+          DATABASE_URL: postgresql+psycopg://nestora:nestora-pass@localhost:5432/nestora
+          SEED_ADMIN_PASSWORD: test-admin-password
+          SEED_AGENT_PASSWORD: test-agent-password
+          SEED_BUYER_PASSWORD: test-buyer-password
+        run: |
+          upgraded=0
+          for attempt in $(seq 1 8); do
+            if alembic upgrade head; then upgraded=1; break; fi
+            echo "PostgreSQL restarted during migration attempt ${attempt}; retrying"
+            sleep 3
+          done
+          if test "$upgraded" != "1"; then docker logs p2-postgres; exit 1; fi
+          python - <<'PY'
+          from sqlalchemy import create_engine, text
+          import os
+          e=create_engine(os.environ["DATABASE_URL"])
+          with e.connect() as c:
+              assert c.scalar(text("select extname from pg_extension where extname='postgis'")) == "postgis"
+              assert c.scalar(text("select extname from pg_extension where extname='vector'")) == "vector"
+          PY
+          alembic downgrade 0002_p1_platform
+          alembic upgrade head
+      - if: always()
+        run: docker rm -f p2-postgres || true
 
   web:
     runs-on: ubuntu-latest
@@ -28,13 +89,27 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with: { node-version: "22" }
-      - run: npm install
-      - run: npm --workspace apps/web run typecheck
-      - run: npm --workspace apps/web run build
+      - run: npm install --prefix apps/web
+      - run: npm --prefix apps/web run typecheck
+      - run: npm --prefix apps/web run build
         env:
           NEXT_PUBLIC_API_URL: http://localhost:8000/api/v1
           NEXT_PUBLIC_API_ORIGIN: http://localhost:8000
           NEXT_PUBLIC_SITE_URL: http://localhost:3000
+
+  mobile:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "22" }
+      - run: npm install --prefix apps/mobile
+      - run: npm --prefix apps/mobile run doctor
+      - run: npm --prefix apps/mobile run typecheck
+      - run: npm --prefix apps/mobile run export:android
+        env: { EXPO_PUBLIC_API_URL: "https://api.example.invalid/api/v1" }
+      - uses: actions/upload-artifact@v4
+        with: { name: mobile-android-export, path: apps/mobile/dist }
 
   compose:
     runs-on: ubuntu-latest
@@ -47,10 +122,11 @@ jobs:
           echo 'S3_ACCESS_KEY=ci-minio-user' >> .env
           echo 'S3_SECRET_KEY=ci-minio-password' >> .env
       - run: docker compose config
+      - run: docker compose --profile gpu config
 
   e2e:
     runs-on: ubuntu-latest
-    timeout-minutes: 35
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -67,22 +143,27 @@ jobs:
       - run: docker compose up -d --build postgres redis minio minio-init migrate api worker web
       - name: Wait for full stack
         run: |
-          for attempt in $(seq 1 100); do
-            if curl -fsS http://localhost:8000/health >/dev/null && curl -fsS http://localhost:3000 >/dev/null; then
-              exit 0
-            fi
+          for attempt in $(seq 1 110); do
+            if curl -fsS http://localhost:8000/health >/dev/null && curl -fsS http://localhost:3000 >/dev/null; then exit 0; fi
             sleep 3
           done
-          docker compose ps
-          docker compose logs --tail=400
-          exit 1
+          docker compose ps; docker compose logs --tail=500; exit 1
       - run: bash scripts/smoke.sh
-      - run: npm install
-      - run: npx playwright install --with-deps chromium
-      - run: npm --workspace apps/web run test:e2e -- --project=chromium
+      - run: bash scripts/p2-load-smoke.sh
+      - run: npm install --prefix apps/web
+      - run: npx --prefix apps/web playwright install --with-deps chromium
+      - run: npm --prefix apps/web run test:e2e -- --project=chromium
         env:
           PLAYWRIGHT_BASE_URL: http://localhost:3000
+          E2E_BUYER_PASSWORD: ci-e2e-buyer-password
+      - name: Backup and restore rehearsal
+        run: |
+          mkdir -p backups
+          docker compose exec -T postgres pg_dump -U nestora -Fc nestora > backups/ci.dump
+          docker compose exec -T postgres psql -U nestora -d nestora -c "insert into users (id,email,full_name,password_hash,role,is_active,created_at,updated_at) values ('restore-probe','restore-probe@example.invalid','Restore Probe','invalid','buyer',true,now(),now());"
+          docker compose exec -T postgres pg_restore -U nestora -d nestora --clean --if-exists < backups/ci.dump
+          test "$(docker compose exec -T postgres psql -U nestora -d nestora -Atc "select count(*) from users where id='restore-probe'" | tr -d '\r')" = "0"
       - if: always()
-        run: docker compose logs --tail=400
+        run: docker compose logs --tail=500
       - if: always()
         run: docker compose down -v

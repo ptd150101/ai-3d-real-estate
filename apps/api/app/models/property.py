@@ -11,6 +11,7 @@ from .identity import Agent, Project
 class Property(Base, TimestampMixin):
     __tablename__ = "properties"
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    organization_id: Mapped[str | None] = mapped_column(ForeignKey("organizations.id", ondelete="SET NULL"), index=True)
     slug: Mapped[str] = mapped_column(String(300), unique=True, index=True)
     title: Mapped[str] = mapped_column(String(300), index=True)
     transaction_type: Mapped[str] = mapped_column(String(16), default="sale", index=True)
