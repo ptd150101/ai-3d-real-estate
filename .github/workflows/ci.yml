@@ -40,10 +40,21 @@ jobs:
       - run: pip install -r apps/api/requirements.txt
       - run: docker build -t nestora-postgres-ci ./infra/postgres
       - run: docker run -d --name p2-postgres -e POSTGRES_DB=nestora -e POSTGRES_USER=nestora -e POSTGRES_PASSWORD=nestora-pass -p 5432:5432 nestora-postgres-ci
-      - name: Wait for PostgreSQL
+      - name: Wait for stable PostgreSQL
         run: |
-          for i in $(seq 1 40); do docker exec p2-postgres pg_isready -U nestora -d nestora && exit 0; sleep 2; done
-          docker logs p2-postgres; exit 1
+          stable=0
+          for i in $(seq 1 60); do
+            if docker exec p2-postgres pg_isready -U nestora -d nestora >/dev/null \
+              && test "$(docker exec p2-postgres psql -U nestora -d nestora -Atqc 'select 1' 2>/dev/null | tr -d '\r')" = "1"; then
+              stable=$((stable + 1))
+              if test "$stable" -ge 3; then exit 0; fi
+            else
+              stable=0
+            fi
+            sleep 2
+          done
+          docker logs p2-postgres
+          exit 1
       - name: Upgrade and reversible P2 migration
         working-directory: apps/api
         env:
@@ -52,7 +63,13 @@ jobs:
           SEED_AGENT_PASSWORD: test-agent-password
           SEED_BUYER_PASSWORD: test-buyer-password
         run: |
-          alembic upgrade head
+          upgraded=0
+          for attempt in $(seq 1 8); do
+            if alembic upgrade head; then upgraded=1; break; fi
+            echo "PostgreSQL restarted during migration attempt ${attempt}; retrying"
+            sleep 3
+          done
+          if test "$upgraded" != "1"; then docker logs p2-postgres; exit 1; fi
           python - <<'PY'
           from sqlalchemy import create_engine, text
           import os
