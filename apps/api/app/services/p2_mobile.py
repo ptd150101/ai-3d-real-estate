@@ -11,7 +11,16 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from ..config import get_settings
-from ..models import Favorite, MobileDevice, MobileMutation, MobileRefreshToken, Property, User
+from ..models import (
+    AnalyticsEvent,
+    CaptureSession,
+    Favorite,
+    MobileDevice,
+    MobileMutation,
+    MobileRefreshToken,
+    Property,
+    User,
+)
 from ..security import create_access_token, verify_password
 from .push_notifications import PushDeliveryError, PushMessage, send_expo_push
 
@@ -180,7 +189,11 @@ def send_mobile_push(
     disabled_tokens: list[str] = []
     for device, ticket in zip(devices, tickets):
         details = ticket.get("details") if isinstance(ticket, dict) else None
-        if ticket.get("status") == "error" and isinstance(details, dict) and details.get("error") == "DeviceNotRegistered":
+        if (
+            ticket.get("status") == "error"
+            and isinstance(details, dict)
+            and details.get("error") == "DeviceNotRegistered"
+        ):
             disabled_tokens.append(str(device.push_token))
             device.push_token = None
     db.commit()
@@ -208,6 +221,7 @@ def apply_mutation(
     )
     if existing:
         return existing
+
     result: dict[str, Any] = {"applied": True}
     if mutation_type == "favorite.add":
         property_id = payload.get("property_id")
@@ -230,14 +244,44 @@ def apply_mutation(
     elif mutation_type == "capture.metadata":
         required = {"capture_session_id", "metadata"}
         if not required.issubset(payload):
-            raise HTTPException(status_code=422, detail="capture.metadata requires capture_session_id and metadata")
-        result.update({"capture_session_id": payload["capture_session_id"], "queued": True})
+            raise HTTPException(
+                status_code=422,
+                detail="capture.metadata requires capture_session_id and metadata",
+            )
+        session = db.get(CaptureSession, payload["capture_session_id"])
+        if not session or session.created_by_user_id != user.id:
+            raise HTTPException(status_code=404, detail="Capture session not found")
+        requirements = dict(session.requirements_json or {})
+        requirements["mobile_metadata"] = payload["metadata"]
+        requirements["last_device_id"] = device_id
+        session.requirements_json = requirements
+        result.update(
+            {
+                "capture_session_id": session.id,
+                "metadata_saved": True,
+                "status": session.status,
+            }
+        )
     elif mutation_type == "analytics.event":
-        if not payload.get("event"):
+        event_name = str(payload.get("event") or "")
+        if not event_name:
             raise HTTPException(status_code=422, detail="analytics.event requires event")
-        result.update({"event": payload["event"], "accepted": True})
+        event = AnalyticsEvent(
+            user_id=user.id,
+            event_name=event_name,
+            event_version=int(payload.get("version") or 1),
+            property_id=payload.get("property_id"),
+            metadata_json={
+                **(payload.get("metadata") if isinstance(payload.get("metadata"), dict) else {}),
+                "device_id": device_id,
+            },
+            dedupe_key=f"mobile:{user.id}:{device_id}:{client_mutation_id}",
+        )
+        db.add(event)
+        result.update({"event": event_name, "accepted": True})
     else:
         raise HTTPException(status_code=422, detail="Unsupported mutation type")
+
     mutation = MobileMutation(
         user_id=user.id,
         device_id=device_id,
@@ -277,21 +321,16 @@ def revoke_mobile_tokens(
         MobileRefreshToken.device_id == device_id,
     )
     if raw:
-        item = db.scalar(
-            base.where(MobileRefreshToken.token_hash == _hash(raw)).with_for_update()
-        )
+        item = db.scalar(base.where(MobileRefreshToken.token_hash == _hash(raw)).with_for_update())
         if not item:
             return 0
         if item.revoked_at is None:
             item.revoked_at = datetime.now(timezone.utc)
             db.commit()
-        # Logout is idempotent: an already-revoked matching token is acknowledged.
         return 1
     count = 0
     now = datetime.now(timezone.utc)
-    for item in db.scalars(
-        base.where(MobileRefreshToken.revoked_at.is_(None)).with_for_update()
-    ):
+    for item in db.scalars(base.where(MobileRefreshToken.revoked_at.is_(None)).with_for_update()):
         item.revoked_at = now
         count += 1
     db.commit()

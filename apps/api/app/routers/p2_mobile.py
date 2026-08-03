@@ -119,28 +119,40 @@ def bootstrap(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    orgs = []
-    for membership in db.scalars(
-        select(OrganizationMember).where(
-            OrganizationMember.user_id == user.id,
-            OrganizationMember.status == "active",
+    memberships = list(
+        db.scalars(
+            select(OrganizationMember).where(
+                OrganizationMember.user_id == user.id,
+                OrganizationMember.status == "active",
+            )
         )
-    ):
+    )
+    orgs = []
+    organization_ids: list[str] = []
+    for membership in memberships:
         org = db.get(Organization, membership.organization_id)
         if org:
+            organization_ids.append(org.id)
             orgs.append(
                 {"id": org.id, "name": org.name, "slug": org.slug, "role": membership.role}
             )
+    property_query = select(Property).where(Property.status == "published")
+    if organization_ids:
+        property_query = property_query.where(Property.organization_id.in_(organization_ids))
     properties = [
         {
             "id": item.id,
+            "organization_id": item.organization_id,
             "slug": item.slug,
             "title": item.title,
             "price": item.price,
             "district": item.district,
+            "property_type": item.property_type,
             "has_3d": item.has_3d,
+            "latitude": item.latitude,
+            "longitude": item.longitude,
         }
-        for item in db.scalars(select(Property).where(Property.status == "published").limit(50))
+        for item in db.scalars(property_query.order_by(Property.created_at.desc()).limit(100))
     ]
     return {
         "user": {"id": user.id, "full_name": user.full_name, "role": user.role},

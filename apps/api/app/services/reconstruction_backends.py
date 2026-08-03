@@ -12,6 +12,7 @@ from urllib.parse import urlparse
 import httpx
 
 from ..config import Settings, get_settings
+from .storage import read_private_bytes
 
 
 class ReconstructionError(RuntimeError):
@@ -51,10 +52,10 @@ class ReconstructionBackend(Protocol):
 
 
 def _safe_work_dir(settings: Settings, job_id: str) -> Path:
-    root = settings.reconstruction_work_path
+    root = settings.reconstruction_work_path.resolve()
     root.mkdir(parents=True, exist_ok=True)
     work = (root / job_id).resolve()
-    if root not in work.parents:
+    if work == root or root not in work.parents:
         raise ReconstructionError("Invalid reconstruction work path")
     if work.exists():
         shutil.rmtree(work)
@@ -68,10 +69,10 @@ def _run(command: list[str], *, timeout: int, cwd: Path, log_path: Path) -> None
     executable = shutil.which(command[0])
     if not executable:
         raise ReconstructionError(f"Required executable is unavailable: {command[0]}")
-    command = [executable, *command[1:]]
+    resolved_command = [executable, *command[1:]]
     try:
         completed = subprocess.run(
-            command,
+            resolved_command,
             cwd=cwd,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
@@ -81,33 +82,73 @@ def _run(command: list[str], *, timeout: int, cwd: Path, log_path: Path) -> None
             shell=False,
         )
     except subprocess.TimeoutExpired as exc:
-        raise ReconstructionError(f"Command timed out: {command[0]}") from exc
+        raise ReconstructionError(f"Command timed out: {resolved_command[0]}") from exc
     log_path.parent.mkdir(parents=True, exist_ok=True)
     with log_path.open("a", encoding="utf-8") as log:
-        log.write("$ " + " ".join(command) + "\n")
+        log.write("$ " + " ".join(resolved_command) + "\n")
         log.write(completed.stdout[-200_000:] + "\n")
     if completed.returncode != 0:
         raise ReconstructionError(
-            f"Command failed ({completed.returncode}): {command[0]}; see {log_path}"
+            f"Command failed ({completed.returncode}): {resolved_command[0]}; see {log_path}"
         )
 
 
 def _local_storage_source(url: str, settings: Settings) -> Path | None:
     marker = "/storage/"
+    storage_root = settings.storage_path.resolve()
+    work_root = settings.reconstruction_work_path.resolve()
     if marker in url:
         relative = url.split(marker, 1)[1]
-        candidate = (settings.storage_path / relative).resolve()
-        if candidate == settings.storage_path or settings.storage_path not in candidate.parents:
+        candidate = (storage_root / relative).resolve()
+        if candidate == storage_root or storage_root not in candidate.parents:
             raise ReconstructionError("Capture path escapes storage root")
         return candidate
     candidate = Path(url)
     if candidate.is_absolute():
         resolved = candidate.resolve()
-        allowed_roots = [settings.storage_path, settings.reconstruction_work_path]
-        if not any(root == resolved or root in resolved.parents for root in allowed_roots):
+        if not any(root == resolved or root in resolved.parents for root in (storage_root, work_root)):
             raise ReconstructionError("Absolute capture path is outside allowed roots")
         return resolved
     return None
+
+
+def _copy_private_object(url: str, target: Path) -> bool:
+    if not url.startswith("private://"):
+        return False
+    storage_key = url.removeprefix("private://")
+    try:
+        data = read_private_bytes(storage_key)
+    except Exception as exc:
+        raise ReconstructionError("Unable to read private capture object") from exc
+    if not data:
+        raise ReconstructionError("Private capture object is empty")
+    if len(data) > 500_000_000:
+        raise ReconstructionError("Private capture object exceeds 500 MB")
+    target.write_bytes(data)
+    return True
+
+
+def _download_capture(url: str, target: Path, settings: Settings) -> None:
+    parsed = urlparse(url)
+    if parsed.scheme not in {"http", "https"}:
+        raise ReconstructionError(f"Unsupported capture URL: {url}")
+    try:
+        with httpx.stream(
+            "GET",
+            url,
+            timeout=settings.provider_http_timeout_seconds,
+            follow_redirects=False,
+        ) as response:
+            response.raise_for_status()
+            total = 0
+            with target.open("wb") as output:
+                for chunk in response.iter_bytes():
+                    total += len(chunk)
+                    if total > 500_000_000:
+                        raise ReconstructionError("Downloaded capture exceeds 500 MB")
+                    output.write(chunk)
+    except httpx.HTTPError as exc:
+        raise ReconstructionError(f"Unable to download capture: {url}") from exc
 
 
 def _materialize_inputs(
@@ -119,7 +160,11 @@ def _materialize_inputs(
     target_dir.mkdir(parents=True, exist_ok=True)
     materialized: list[Path] = []
     for index, item in enumerate(inputs, 1):
-        suffix = mimetypes.guess_extension(item.mime_type) or Path(urlparse(item.url).path).suffix or ".bin"
+        suffix = (
+            mimetypes.guess_extension(item.mime_type)
+            or Path(urlparse(item.url).path).suffix
+            or ".bin"
+        )
         target = target_dir / f"capture-{index:04d}{suffix}"
         local_source = _local_storage_source(item.url, settings)
         if local_source:
@@ -128,27 +173,8 @@ def _materialize_inputs(
             if local_source.stat().st_size > 500_000_000:
                 raise ReconstructionError("Capture file exceeds 500 MB")
             shutil.copyfile(local_source, target)
-        else:
-            parsed = urlparse(item.url)
-            if parsed.scheme not in {"http", "https"}:
-                raise ReconstructionError(f"Unsupported capture URL: {item.url}")
-            try:
-                with httpx.stream(
-                    "GET",
-                    item.url,
-                    timeout=settings.provider_http_timeout_seconds,
-                    follow_redirects=False,
-                ) as response:
-                    response.raise_for_status()
-                    total = 0
-                    with target.open("wb") as output:
-                        for chunk in response.iter_bytes():
-                            total += len(chunk)
-                            if total > 500_000_000:
-                                raise ReconstructionError("Downloaded capture exceeds 500 MB")
-                            output.write(chunk)
-            except httpx.HTTPError as exc:
-                raise ReconstructionError(f"Unable to download capture: {item.url}") from exc
+        elif not _copy_private_object(item.url, target):
+            _download_capture(item.url, target, settings)
         digest = hashlib.sha256(target.read_bytes()).hexdigest()
         expected = item.sha256.lower()
         if len(expected) >= 32 and digest != expected:
@@ -180,11 +206,15 @@ class FixtureBackend:
         progress("optimization", 80, {"fixture": True})
         if representation == "gaussian_splat":
             output = work / f"{job_id}.ply"
-            output.write_text("ply\nformat ascii 1.0\nelement vertex 0\nend_header\n", encoding="utf-8")
+            output.write_text(
+                "ply\nformat ascii 1.0\nelement vertex 0\nend_header\n",
+                encoding="utf-8",
+            )
             asset_type = "gaussian_splat"
         else:
             output = work / f"{job_id}.glb"
-            output.write_bytes(b"glTF" + bytes(128))
+            body = bytes(116)
+            output.write_bytes(b"glTF" + (2).to_bytes(4, "little") + (128).to_bytes(4, "little") + body)
             asset_type = "glb"
         progress("preview", 92, {"fixture": True})
         return ReconstructionResult(
@@ -224,7 +254,16 @@ class COLMAPBackend:
 
         progress("quality_check", 10, {"file_count": len(inputs), "backend": self.name})
         _run(
-            [binary, "feature_extractor", "--database_path", str(database), "--image_path", str(images), "--ImageReader.single_camera", "1"],
+            [
+                binary,
+                "feature_extractor",
+                "--database_path",
+                str(database),
+                "--image_path",
+                str(images),
+                "--ImageReader.single_camera",
+                "1",
+            ],
             timeout=timeout,
             cwd=work,
             log_path=log,
@@ -238,7 +277,16 @@ class COLMAPBackend:
         )
         progress("feature_matching", 38, {})
         _run(
-            [binary, "mapper", "--database_path", str(database), "--image_path", str(images), "--output_path", str(sparse)],
+            [
+                binary,
+                "mapper",
+                "--database_path",
+                str(database),
+                "--image_path",
+                str(images),
+                "--output_path",
+                str(sparse),
+            ],
             timeout=timeout,
             cwd=work,
             log_path=log,
@@ -249,13 +297,33 @@ class COLMAPBackend:
         model = models[0]
         progress("camera_reconstruction", 52, {"model": str(model)})
         _run(
-            [binary, "image_undistorter", "--image_path", str(images), "--input_path", str(model), "--output_path", str(dense), "--output_type", "COLMAP"],
+            [
+                binary,
+                "image_undistorter",
+                "--image_path",
+                str(images),
+                "--input_path",
+                str(model),
+                "--output_path",
+                str(dense),
+                "--output_type",
+                "COLMAP",
+            ],
             timeout=timeout,
             cwd=work,
             log_path=log,
         )
         _run(
-            [binary, "patch_match_stereo", "--workspace_path", str(dense), "--workspace_format", "COLMAP", "--PatchMatchStereo.geom_consistency", "true"],
+            [
+                binary,
+                "patch_match_stereo",
+                "--workspace_path",
+                str(dense),
+                "--workspace_format",
+                "COLMAP",
+                "--PatchMatchStereo.geom_consistency",
+                "true",
+            ],
             timeout=timeout,
             cwd=work,
             log_path=log,
@@ -263,7 +331,18 @@ class COLMAPBackend:
         progress("dense_reconstruction", 75, {})
         fused = work / f"{job_id}.ply"
         _run(
-            [binary, "stereo_fusion", "--workspace_path", str(dense), "--workspace_format", "COLMAP", "--input_type", "geometric", "--output_path", str(fused)],
+            [
+                binary,
+                "stereo_fusion",
+                "--workspace_path",
+                str(dense),
+                "--workspace_format",
+                "COLMAP",
+                "--input_type",
+                "geometric",
+                "--output_path",
+                str(fused),
+            ],
             timeout=timeout,
             cwd=work,
             log_path=log,
@@ -334,7 +413,11 @@ class NerfstudioBackend:
             cwd=work,
             log_path=log,
         )
-        configs = sorted(runs.rglob("config.yml"), key=lambda path: path.stat().st_mtime, reverse=True)
+        configs = sorted(
+            runs.rglob("config.yml"),
+            key=lambda path: path.stat().st_mtime,
+            reverse=True,
+        )
         if not configs:
             raise ReconstructionError("Nerfstudio did not produce a training config")
         config = configs[0]
@@ -407,7 +490,10 @@ class NerfstudioBackend:
         )
 
 
-def get_reconstruction_backend(name: str | None = None, settings: Settings | None = None) -> ReconstructionBackend:
+def get_reconstruction_backend(
+    name: str | None = None,
+    settings: Settings | None = None,
+) -> ReconstructionBackend:
     settings = settings or get_settings()
     normalized = (name or settings.reconstruction_backend).strip().lower()
     if normalized == "fixture":
