@@ -1,0 +1,42 @@
+name: Complete demo plan
+
+on:
+  push:
+    branches:
+      - agent/complete-demo-plan
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/complete-demo-plan
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Apply final demo implementation
+        run: python scripts/complete_demo_plan.py
+      - name: Validate generated sources
+        run: |
+          python -m compileall -q apps/api/app apps/api/tests
+          python - <<'PY'
+          import json, re
+          from pathlib import Path
+          rows = json.loads(Path('apps/api/app/fixtures/demo/properties.json').read_text())
+          assert len(rows) == 72
+          assert len({row['slug'] for row in rows}) == 72
+          assert all(re.fullmatch(r'[a-z0-9-]+', row['slug']) for row in rows)
+          PY
+      - name: Commit implementation
+        run: |
+          rm scripts/complete_demo_plan.py .github/workflows/complete-demo-plan.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -m 'Complete demo compatibility and E2E coverage'
+          git push origin HEAD:agent/complete-demo-plan
