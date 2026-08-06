@@ -1,4 +1,4 @@
-.PHONY: setup up infra down logs test migrate migrate-docker dev-api dev-worker dev-web openapi backup restore
+.PHONY: setup up infra down logs test migrate migrate-docker seed-demo reset-demo dev-api dev-worker dev-web openapi backup restore
 
 setup:
 	@test -f .env || cp .env.example .env
@@ -23,6 +23,12 @@ migrate: setup
 
 migrate-docker: setup
 	docker compose run --rm migrate
+
+seed-demo: setup
+	cd apps/api && uv run --env-file ../../.env python -m app.cli.seed_demo --preset mvp --upsert
+
+reset-demo: setup
+	cd apps/api && uv run --env-file ../../.env python -m app.cli.seed_demo --preset mvp --reset-demo --force-assets
 
 dev-api: setup
 	cd apps/api && uv run --env-file ../../.env alembic upgrade head

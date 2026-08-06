@@ -21,6 +21,7 @@ from .routers import (
     calendar,
     chat,
     crm,
+    demo_assets,
     engagement,
     experience,
     health,
@@ -71,8 +72,8 @@ async def lifespan(_: FastAPI):
 
 app = FastAPI(
     title=settings.app_name,
-    version="2.1.0",
-    description="Multi-agency AI and immersive real-estate marketplace with live provider adapters, ML serving, reconstruction, AR/VR and mobile.",
+    version="2.2.0",
+    description="Multi-agency AI and immersive real-estate marketplace with deterministic demo data, live provider adapters, ML serving, reconstruction, AR/VR and mobile.",
     lifespan=lifespan,
 )
 app.add_middleware(
@@ -171,6 +172,7 @@ for router in [
     p2_spatial.router,
     p2_mobile.router,
     p2_mlops.router,
+    demo_assets.router,
 ]:
     app.include_router(router, prefix=settings.api_prefix)
 app.include_router(health.router)
@@ -179,4 +181,4 @@ app.mount("/storage", StaticFiles(directory=str(settings.storage_path), check_di
 
 @app.get("/")
 def root():
-    return {"name": settings.app_name, "version": "2.1.0", "docs": "/docs", "health": "/health"}
+    return {"name": settings.app_name, "version": "2.2.0", "docs": "/docs", "health": "/health"}
