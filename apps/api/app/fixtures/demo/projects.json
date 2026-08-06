@@ -1,0 +1,80 @@
+[
+  {
+    "slug": "demo-westlake-residence",
+    "name": "Westlake Residence",
+    "developer": "Nestora Development",
+    "description": "Khu căn hộ ven Hồ Tây với tiện ích cao cấp và không gian xanh.",
+    "city": "Hà Nội",
+    "district": "Tây Hồ",
+    "address": "Võ Chí Công, Tây Hồ, Hà Nội",
+    "latitude": 21.066,
+    "longitude": 105.801,
+    "status": "selling",
+    "cover_url": "/api/backend/demo-assets/images/project/1.svg"
+  },
+  {
+    "slug": "demo-smart-city-garden",
+    "name": "Smart City Garden",
+    "developer": "Urban Future",
+    "description": "Khu căn hộ thông minh phía Tây với trường học, công viên và trung tâm thương mại.",
+    "city": "Hà Nội",
+    "district": "Nam Từ Liêm",
+    "address": "Đại lộ Thăng Long, Nam Từ Liêm, Hà Nội",
+    "latitude": 21.006,
+    "longitude": 105.735,
+    "status": "selling",
+    "cover_url": "/api/backend/demo-assets/images/project/2.svg"
+  },
+  {
+    "slug": "demo-riverside-long-bien",
+    "name": "Riverside Long Biên",
+    "developer": "East River Group",
+    "description": "Khu nhà ở ven sông với biệt thự, nhà phố và cảnh quan mở.",
+    "city": "Hà Nội",
+    "district": "Long Biên",
+    "address": "Nguyễn Văn Cừ, Long Biên, Hà Nội",
+    "latitude": 21.055,
+    "longitude": 105.901,
+    "status": "selling",
+    "cover_url": "/api/backend/demo-assets/images/project/3.svg"
+  },
+  {
+    "slug": "demo-green-park-ha-dong",
+    "name": "Green Park Hà Đông",
+    "developer": "Green City",
+    "description": "Quần thể căn hộ và shophouse gần tuyến metro, công viên nội khu.",
+    "city": "Hà Nội",
+    "district": "Hà Đông",
+    "address": "Tố Hữu, Hà Đông, Hà Nội",
+    "latitude": 20.982,
+    "longitude": 105.786,
+    "status": "selling",
+    "cover_url": "/api/backend/demo-assets/images/project/4.svg"
+  },
+  {
+    "slug": "demo-central-residence",
+    "name": "Central Residence",
+    "developer": "Capital Homes",
+    "description": "Dự án căn hộ trung tâm kết nối nhanh Ba Đình, Cầu Giấy và Thanh Xuân.",
+    "city": "Hà Nội",
+    "district": "Cầu Giấy",
+    "address": "Trần Duy Hưng, Cầu Giấy, Hà Nội",
+    "latitude": 21.009,
+    "longitude": 105.799,
+    "status": "selling",
+    "cover_url": "/api/backend/demo-assets/images/project/5.svg"
+  },
+  {
+    "slug": "demo-dong-anh-new-city",
+    "name": "Đông Anh New City",
+    "developer": "North Gate JSC",
+    "description": "Khu đô thị mới phía Bắc với nhà phố, biệt thự và hạ tầng đồng bộ.",
+    "city": "Hà Nội",
+    "district": "Đông Anh",
+    "address": "Vĩnh Ngọc, Đông Anh, Hà Nội",
+    "latitude": 21.126,
+    "longitude": 105.836,
+    "status": "planning",
+    "cover_url": "/api/backend/demo-assets/images/project/6.svg"
+  }
+]

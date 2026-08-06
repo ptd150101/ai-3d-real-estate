@@ -1,0 +1,452 @@
+[
+  {
+    "id": "studio-compact",
+    "label": "Studio Compact",
+    "property_types": [
+      "studio"
+    ],
+    "floors": 1,
+    "width": 7.0,
+    "depth": 6.0,
+    "rooms": [
+      [
+        "Phòng khách + bếp",
+        "living_room",
+        0.0,
+        0.0
+      ],
+      [
+        "Khu ngủ",
+        "bedroom",
+        1.8,
+        -1.2
+      ],
+      [
+        "WC",
+        "bathroom",
+        -2.1,
+        -1.4
+      ]
+    ],
+    "camera": {
+      "mode": "orthographic",
+      "position": [
+        9,
+        8,
+        9
+      ],
+      "target": [
+        0,
+        0.7,
+        0
+      ],
+      "zoom": 58
+    }
+  },
+  {
+    "id": "apartment-2br",
+    "label": "Apartment 2BR",
+    "property_types": [
+      "apartment"
+    ],
+    "floors": 1,
+    "width": 10.0,
+    "depth": 8.0,
+    "rooms": [
+      [
+        "Phòng khách",
+        "living_room",
+        0.0,
+        1.2
+      ],
+      [
+        "Bếp",
+        "kitchen",
+        -2.8,
+        1.0
+      ],
+      [
+        "Phòng ngủ chính",
+        "master_bedroom",
+        2.5,
+        -1.8
+      ],
+      [
+        "Phòng ngủ 2",
+        "bedroom",
+        -2.4,
+        -1.9
+      ],
+      [
+        "WC",
+        "bathroom",
+        0.0,
+        -2.4
+      ]
+    ],
+    "camera": {
+      "mode": "orthographic",
+      "position": [
+        11,
+        10,
+        11
+      ],
+      "target": [
+        0,
+        0.8,
+        0
+      ],
+      "zoom": 52
+    }
+  },
+  {
+    "id": "apartment-3br",
+    "label": "Apartment 3BR",
+    "property_types": [
+      "apartment"
+    ],
+    "floors": 1,
+    "width": 12.0,
+    "depth": 9.0,
+    "rooms": [
+      [
+        "Phòng khách",
+        "living_room",
+        0.0,
+        1.8
+      ],
+      [
+        "Bếp và bàn ăn",
+        "kitchen",
+        -3.4,
+        1.2
+      ],
+      [
+        "Phòng ngủ chính",
+        "master_bedroom",
+        3.4,
+        -1.8
+      ],
+      [
+        "Phòng ngủ 2",
+        "bedroom",
+        0.2,
+        -2.3
+      ],
+      [
+        "Phòng ngủ 3",
+        "bedroom",
+        -3.0,
+        -2.1
+      ],
+      [
+        "Ban công",
+        "balcony",
+        4.4,
+        1.7
+      ]
+    ],
+    "camera": {
+      "mode": "orthographic",
+      "position": [
+        13,
+        11,
+        13
+      ],
+      "target": [
+        0,
+        0.8,
+        0
+      ],
+      "zoom": 48
+    }
+  },
+  {
+    "id": "apartment-luxury",
+    "label": "Luxury Apartment",
+    "property_types": [
+      "apartment",
+      "penthouse"
+    ],
+    "floors": 1,
+    "width": 14.0,
+    "depth": 10.0,
+    "rooms": [
+      [
+        "Sảnh",
+        "foyer",
+        -4.3,
+        2.7
+      ],
+      [
+        "Phòng khách lớn",
+        "living_room",
+        0.0,
+        2.0
+      ],
+      [
+        "Bếp đảo",
+        "kitchen",
+        -3.0,
+        0.3
+      ],
+      [
+        "Phòng ngủ master",
+        "master_bedroom",
+        3.8,
+        -1.7
+      ],
+      [
+        "Phòng ngủ phụ",
+        "bedroom",
+        0.2,
+        -2.7
+      ],
+      [
+        "Phòng làm việc",
+        "office",
+        -3.8,
+        -2.5
+      ],
+      [
+        "Logia",
+        "balcony",
+        5.4,
+        2.3
+      ]
+    ],
+    "camera": {
+      "mode": "orthographic",
+      "position": [
+        15,
+        12,
+        15
+      ],
+      "target": [
+        0,
+        0.9,
+        0
+      ],
+      "zoom": 45
+    }
+  },
+  {
+    "id": "townhouse-3-floor",
+    "label": "Townhouse 3 Floor",
+    "property_types": [
+      "townhouse"
+    ],
+    "floors": 3,
+    "width": 7.0,
+    "depth": 12.0,
+    "rooms": [
+      [
+        "Phòng khách",
+        "living_room",
+        0.0,
+        2.5
+      ],
+      [
+        "Bếp",
+        "kitchen",
+        0.0,
+        -2.4
+      ],
+      [
+        "Phòng ngủ",
+        "bedroom",
+        0.0,
+        1.0
+      ],
+      [
+        "Phòng thờ",
+        "worship",
+        0.0,
+        -1.7
+      ]
+    ],
+    "camera": {
+      "mode": "orthographic",
+      "position": [
+        14,
+        14,
+        14
+      ],
+      "target": [
+        0,
+        3.5,
+        0
+      ],
+      "zoom": 46
+    }
+  },
+  {
+    "id": "townhouse-4-floor",
+    "label": "Townhouse 4 Floor",
+    "property_types": [
+      "townhouse",
+      "shophouse"
+    ],
+    "floors": 4,
+    "width": 8.0,
+    "depth": 13.0,
+    "rooms": [
+      [
+        "Mặt bằng kinh doanh",
+        "commercial",
+        0.0,
+        2.8
+      ],
+      [
+        "Bếp",
+        "kitchen",
+        0.0,
+        -2.8
+      ],
+      [
+        "Phòng ngủ",
+        "bedroom",
+        0.0,
+        1.0
+      ],
+      [
+        "Phòng làm việc",
+        "office",
+        0.0,
+        -1.8
+      ],
+      [
+        "Sân thượng",
+        "terrace",
+        0.0,
+        0.0
+      ]
+    ],
+    "camera": {
+      "mode": "orthographic",
+      "position": [
+        16,
+        16,
+        16
+      ],
+      "target": [
+        0,
+        5.0,
+        0
+      ],
+      "zoom": 42
+    }
+  },
+  {
+    "id": "villa-garden",
+    "label": "Villa Garden",
+    "property_types": [
+      "villa"
+    ],
+    "floors": 2,
+    "width": 16.0,
+    "depth": 14.0,
+    "rooms": [
+      [
+        "Phòng khách",
+        "living_room",
+        0.0,
+        2.5
+      ],
+      [
+        "Bếp lớn",
+        "kitchen",
+        -4.0,
+        0.0
+      ],
+      [
+        "Phòng ngủ master",
+        "master_bedroom",
+        4.0,
+        -2.4
+      ],
+      [
+        "Phòng ngủ phụ",
+        "bedroom",
+        -3.2,
+        -2.8
+      ],
+      [
+        "Sân vườn",
+        "garden",
+        6.0,
+        3.8
+      ],
+      [
+        "Gara",
+        "garage",
+        -5.5,
+        3.5
+      ]
+    ],
+    "camera": {
+      "mode": "orthographic",
+      "position": [
+        18,
+        15,
+        18
+      ],
+      "target": [
+        0,
+        2.2,
+        0
+      ],
+      "zoom": 38
+    }
+  },
+  {
+    "id": "shophouse",
+    "label": "Shophouse",
+    "property_types": [
+      "shophouse"
+    ],
+    "floors": 3,
+    "width": 9.0,
+    "depth": 14.0,
+    "rooms": [
+      [
+        "Khu trưng bày",
+        "commercial",
+        0.0,
+        3.2
+      ],
+      [
+        "Kho",
+        "storage",
+        0.0,
+        -3.5
+      ],
+      [
+        "Văn phòng",
+        "office",
+        0.0,
+        1.0
+      ],
+      [
+        "Phòng sinh hoạt",
+        "living_room",
+        0.0,
+        -1.8
+      ]
+    ],
+    "camera": {
+      "mode": "orthographic",
+      "position": [
+        15,
+        14,
+        15
+      ],
+      "target": [
+        0,
+        3.5,
+        0
+      ],
+      "zoom": 43
+    }
+  }
+]
