@@ -7,7 +7,16 @@ import secrets
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from .models import Agency, Agent, Property, User
+from .models import (
+    Agency,
+    Agent,
+    KnowledgeChunk,
+    KnowledgeDocument,
+    NearbyPlace,
+    Project,
+    Property,
+    User,
+)
 from .security import hash_password
 from .services.demo_seed import FIXTURE_ROOT, reset_demo_data, seed_demo_data
 from .services.p2_intelligence import DISTRICT_PRICE_M2, TYPE_FACTOR
@@ -33,6 +42,14 @@ _DEMO_TYPE_FACTORS = {
     "shophouse": 1.18,
     "studio": 0.92,
     "penthouse": 1.32,
+}
+_LEGACY_PROPERTY_SLUGS = {
+    "nha-pho-hien-dai-cau-giay",
+    "can-ho-3pn-view-ho-tay",
+    "biet-thu-san-vuon-long-bien",
+    "chung-cu-2pn-nam-tu-liem",
+    "shophouse-ha-dong",
+    "nha-thue-tay-ho-co-3d",
 }
 
 
@@ -112,6 +129,45 @@ def _install_demo_valuation_baseline() -> None:
     TYPE_FACTOR.update(_DEMO_TYPE_FACTORS)
 
 
+def _remove_legacy_seed_records(db: Session) -> None:
+    """Remove the six pre-catalog listings without touching user-created data."""
+    properties = list(
+        db.scalars(select(Property).where(Property.slug.in_(_LEGACY_PROPERTY_SLUGS)))
+    )
+    property_ids = [item.id for item in properties]
+    if property_ids:
+        documents = list(
+            db.scalars(
+                select(KnowledgeDocument).where(
+                    KnowledgeDocument.property_id.in_(property_ids)
+                )
+            )
+        )
+        document_ids = [document.id for document in documents]
+        if document_ids:
+            db.query(KnowledgeChunk).filter(
+                KnowledgeChunk.document_id.in_(document_ids)
+            ).delete(synchronize_session=False)
+        for document in documents:
+            db.delete(document)
+        db.query(NearbyPlace).filter(NearbyPlace.property_id.in_(property_ids)).delete(
+            synchronize_session=False
+        )
+        for item in properties:
+            db.delete(item)
+        db.flush()
+
+    legacy_project = db.scalar(
+        select(Project).where(
+            Project.slug == "westlake-residence",
+            Project.name == "Westlake Residence",
+        )
+    )
+    if legacy_project:
+        db.delete(legacy_project)
+        db.flush()
+
+
 def _reset_stale_demo_catalog(db: Session) -> None:
     # Replace older fixture revisions instead of accumulating duplicate listings.
     rows = json.loads((FIXTURE_ROOT / "properties.json").read_text(encoding="utf-8"))
@@ -170,6 +226,7 @@ def seed_database(db: Session) -> dict[str, int]:
         password_env="SEED_AGENT_PASSWORD",
     )
     db.flush()
+    _remove_legacy_seed_records(db)
     _reset_stale_demo_catalog(db)
     _adopt_legacy_demo_agencies(db)
     result = seed_demo_data(db, admin=admin, preset="mvp")
