@@ -61,11 +61,22 @@ npm install --prefix apps/web
 npm --prefix apps/web run dev
 ```
 
-Cross-platform helpers are available under `scripts/`:
+Cross-platform helpers accept one of `infra`, `api`, `worker` or `web`:
 
-- `dev-infra.ps1`, `dev-api.ps1`, `dev-worker.ps1` for PowerShell.
-- `dev-infra.sh`, `dev-api.sh`, `dev-worker.sh` for Bash.
-- `dev-infra.bat`, `dev-api.bat`, `dev-worker.bat` for Command Prompt.
+```powershell
+.\scripts\dev.ps1 infra
+.\scripts\dev.ps1 api
+```
+
+```bash
+./scripts/dev.sh infra
+./scripts/dev.sh api
+```
+
+```bat
+scripts\dev.bat infra
+scripts\dev.bat api
+```
 
 ## Local checks
 
