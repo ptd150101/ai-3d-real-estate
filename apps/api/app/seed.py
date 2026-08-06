@@ -4,19 +4,10 @@ import json
 import os
 import secrets
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
-from .models import (
-    Agency,
-    Agent,
-    KnowledgeChunk,
-    KnowledgeDocument,
-    NearbyPlace,
-    Project,
-    Property,
-    User,
-)
+from .models import Agency, Agent, Project, Property, User
 from .security import hash_password
 from .services.demo_seed import FIXTURE_ROOT, reset_demo_data, seed_demo_data
 from .services.p2_intelligence import DISTRICT_PRICE_M2, TYPE_FACTOR
@@ -130,42 +121,29 @@ def _install_demo_valuation_baseline() -> None:
 
 
 def _remove_legacy_seed_records(db: Session) -> None:
-    """Remove the six pre-catalog listings without touching user-created data."""
-    properties = list(
-        db.scalars(select(Property).where(Property.slug.in_(_LEGACY_PROPERTY_SLUGS)))
-    )
-    property_ids = [item.id for item in properties]
-    if property_ids:
-        documents = list(
-            db.scalars(
-                select(KnowledgeDocument).where(
-                    KnowledgeDocument.property_id.in_(property_ids)
-                )
-            )
-        )
-        document_ids = [document.id for document in documents]
-        if document_ids:
-            db.query(KnowledgeChunk).filter(
-                KnowledgeChunk.document_id.in_(document_ids)
-            ).delete(synchronize_session=False)
-        for document in documents:
-            db.delete(document)
-        db.query(NearbyPlace).filter(NearbyPlace.property_id.in_(property_ids)).delete(
-            synchronize_session=False
-        )
-        for item in properties:
-            db.delete(item)
-        db.flush()
+    """Remove the six pre-catalog listings without touching user-created data.
 
-    legacy_project = db.scalar(
-        select(Project).where(
+    Use SQL DELETE statements so PostgreSQL handles dependent rows through the
+    configured ON DELETE rules. This avoids ORM row-count warnings caused by
+    marking both parent and database-cascaded child objects for deletion.
+    """
+    property_ids = list(
+        db.scalars(select(Property.id).where(Property.slug.in_(_LEGACY_PROPERTY_SLUGS)))
+    )
+    if property_ids:
+        db.execute(
+            delete(Property).where(Property.id.in_(property_ids)),
+            execution_options={"synchronize_session": False},
+        )
+
+    db.execute(
+        delete(Project).where(
             Project.slug == "westlake-residence",
             Project.name == "Westlake Residence",
-        )
+        ),
+        execution_options={"synchronize_session": False},
     )
-    if legacy_project:
-        db.delete(legacy_project)
-        db.flush()
+    db.flush()
 
 
 def _reset_stale_demo_catalog(db: Session) -> None:
