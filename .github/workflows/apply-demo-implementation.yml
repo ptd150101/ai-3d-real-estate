@@ -27,6 +27,7 @@ jobs:
               scripts/.demo_impl_payload_02 \
               scripts/.demo_impl_payload_03 \
               scripts/.demo_impl_payload_04 > /tmp/apply_demo_implementation.py
+          sed -i 's|root = Path(__file__).resolve().parents\[1\]|root = Path.cwd()|' /tmp/apply_demo_implementation.py
           python /tmp/apply_demo_implementation.py
           rm -f scripts/.demo_impl_payload_*
       - name: Commit implementation
