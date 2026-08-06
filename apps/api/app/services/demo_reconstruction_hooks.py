@@ -1,12 +1,10 @@
 from __future__ import annotations
 
-from pathlib import Path
 from typing import Any
 
 from sqlalchemy import event, inspect
 from sqlalchemy.orm import Session
 
-from ..database import SessionLocal
 from ..demo_assets import (
     build_demo_glb,
     demo_poster_url,
@@ -31,16 +29,30 @@ _PATCHED = False
 _HOOK_REGISTERED = False
 
 
-def _template_for_job(job_id: str) -> tuple[str, Property | None]:
-    with SessionLocal() as db:
-        job = db.get(ReconstructionJob, job_id)
-        capture = db.get(CaptureSession, job.session_id) if job else None
-        prop = db.get(Property, capture.property_id) if capture else None
-        if not prop:
-            return "apartment-2br", None
-        template_id = select_model_template(prop.property_type, prop.bedrooms, prop.floors_count)
-        # Return a detached scalar-only object; callers only read simple fields.
-        return template_id, prop
+def configure_fixture_backend(
+    backend: FixtureBackend,
+    db: Session,
+    capture: CaptureSession,
+) -> None:
+    """Attach request-scoped demo metadata without opening another DB connection.
+
+    This is important for SQLite in-memory tests, where a newly-created SessionLocal
+    would point at a different database. PostgreSQL and local SQLite use the exact
+    same code path.
+    """
+    prop = db.get(Property, capture.property_id)
+    if prop:
+        template_id = select_model_template(
+            prop.property_type,
+            prop.bedrooms,
+            prop.floors_count,
+        )
+        property_id: str | None = prop.id
+    else:
+        template_id = "apartment-2br"
+        property_id = None
+    setattr(backend, "_demo_template_id", template_id)
+    setattr(backend, "_demo_property_id", property_id)
 
 
 def _fixture_run(
@@ -62,7 +74,8 @@ def _fixture_run(
         shutil.rmtree(work)
     work.mkdir(parents=True)
 
-    template_id, prop = _template_for_job(job_id)
+    template_id = str(getattr(self, "_demo_template_id", "apartment-2br"))
+    property_id = getattr(self, "_demo_property_id", None)
     progress("quality_check", 15, {"file_count": len(inputs), "backend": self.name})
     progress("camera_reconstruction", 40, {"fixture": True, "template_id": template_id})
     progress("dense_reconstruction", 65, {"fixture": True, "template_id": template_id})
@@ -93,7 +106,7 @@ def _fixture_run(
             "template_id": template_id,
             "default_camera": template.get("camera") or {},
             "file_size_bytes": output.stat().st_size,
-            "property_id": prop.id if prop else None,
+            "property_id": property_id,
         },
     )
 
@@ -126,7 +139,9 @@ def _sync_property_model(session: Session, artifact: ReconstructionArtifact) -> 
     model.draco_compressed = False
     model.meshopt_compressed = False
     model.ktx2_textures = False
-    model.default_camera = dict(metadata.get("default_camera") or template.get("camera") or {})
+    model.default_camera = dict(
+        metadata.get("default_camera") or template.get("camera") or {}
+    )
     model.quality_presets = {
         "low": {"dpr": 1},
         "medium": {"dpr": 1.5},
@@ -180,7 +195,11 @@ def install_demo_reconstruction_hooks() -> None:
         return
 
     @event.listens_for(Session, "before_flush")
-    def sync_approved_artifacts(session: Session, _flush_context: Any, _instances: Any) -> None:
+    def sync_approved_artifacts(
+        session: Session,
+        _flush_context: Any,
+        _instances: Any,
+    ) -> None:
         for item in list(session.dirty):
             if not isinstance(item, ReconstructionArtifact) or not item.published:
                 continue
