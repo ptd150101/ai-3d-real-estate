@@ -3,8 +3,10 @@ from __future__ import annotations
 from typing import Any
 
 from sqlalchemy import event, inspect
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
+from ..database import SessionLocal
 from ..demo_assets import (
     build_demo_glb,
     demo_poster_url,
@@ -27,32 +29,56 @@ from .reconstruction_backends import FixtureBackend, ReconstructionResult
 
 _PATCHED = False
 _HOOK_REGISTERED = False
+_JOB_CONTEXT: dict[str, tuple[str, str | None]] = {}
 
 
-def configure_fixture_backend(
-    backend: FixtureBackend,
-    db: Session,
-    capture: CaptureSession,
-) -> None:
-    """Attach request-scoped demo metadata without opening another DB connection.
+def _context_for_capture(
+    session: Session,
+    capture: CaptureSession | None,
+) -> tuple[str, str | None]:
+    prop = session.get(Property, capture.property_id) if capture else None
+    if not prop:
+        return "apartment-2br", None
+    return (
+        select_model_template(prop.property_type, prop.bedrooms, prop.floors_count),
+        prop.id,
+    )
 
-    This is important for SQLite in-memory tests, where a newly-created SessionLocal
-    would point at a different database. PostgreSQL and local SQLite use the exact
-    same code path.
-    """
-    prop = db.get(Property, capture.property_id)
-    if prop:
-        template_id = select_model_template(
-            prop.property_type,
-            prop.bedrooms,
-            prop.floors_count,
-        )
-        property_id: str | None = prop.id
-    else:
-        template_id = "apartment-2br"
-        property_id = None
-    setattr(backend, "_demo_template_id", template_id)
-    setattr(backend, "_demo_property_id", property_id)
+
+def _persist_job_context(session: Session, job: ReconstructionJob) -> None:
+    if not job.id:
+        job.id = new_id()
+    capture = session.get(CaptureSession, job.session_id)
+    template_id, property_id = _context_for_capture(session, capture)
+    checkpoint = dict(job.checkpoint_json or {})
+    checkpoint.update(
+        {
+            "fixture_template_id": template_id,
+            "fixture_property_id": property_id,
+        }
+    )
+    job.checkpoint_json = checkpoint
+    _JOB_CONTEXT[job.id] = (template_id, property_id)
+
+
+def _template_for_job(job_id: str) -> tuple[str, str | None]:
+    cached = _JOB_CONTEXT.get(job_id)
+    if cached:
+        return cached
+    try:
+        with SessionLocal() as db:
+            job = db.get(ReconstructionJob, job_id)
+            checkpoint = dict(job.checkpoint_json or {}) if job else {}
+            template_id = checkpoint.get("fixture_template_id")
+            property_id = checkpoint.get("fixture_property_id")
+            if template_id:
+                return str(template_id), str(property_id) if property_id else None
+            capture = db.get(CaptureSession, job.session_id) if job else None
+            return _context_for_capture(db, capture)
+    except SQLAlchemyError:
+        # A separate SessionLocal cannot see a SQLite in-memory test database.
+        # The normal test path is served by _JOB_CONTEXT populated before flush.
+        return "apartment-2br", None
 
 
 def _fixture_run(
@@ -74,8 +100,7 @@ def _fixture_run(
         shutil.rmtree(work)
     work.mkdir(parents=True)
 
-    template_id = str(getattr(self, "_demo_template_id", "apartment-2br"))
-    property_id = getattr(self, "_demo_property_id", None)
+    template_id, property_id = _template_for_job(job_id)
     progress("quality_check", 15, {"file_count": len(inputs), "backend": self.name})
     progress("camera_reconstruction", 40, {"fixture": True, "template_id": template_id})
     progress("dense_reconstruction", 65, {"fixture": True, "template_id": template_id})
@@ -166,7 +191,8 @@ def _sync_property_model(session: Session, artifact: ReconstructionArtifact) -> 
         )
         model.floors.append(floor)
         floors.append(floor)
-    for row in template_hotspot_payload(template_id):
+    for hotspot_row in template_hotspot_payload(template_id):
+        row = dict(hotspot_row)
         floor_index = min(int(row.pop("floor_index")), len(floors) - 1)
         model.hotspots.append(
             PropertyHotspot(
@@ -195,11 +221,14 @@ def install_demo_reconstruction_hooks() -> None:
         return
 
     @event.listens_for(Session, "before_flush")
-    def sync_approved_artifacts(
+    def prepare_jobs_and_sync_artifacts(
         session: Session,
         _flush_context: Any,
         _instances: Any,
     ) -> None:
+        for item in list(session.new):
+            if isinstance(item, ReconstructionJob):
+                _persist_job_context(session, item)
         for item in list(session.dirty):
             if not isinstance(item, ReconstructionArtifact) or not item.published:
                 continue
