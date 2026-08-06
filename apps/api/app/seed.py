@@ -46,8 +46,12 @@ def _ensure_compatibility_agent(db: Session, user: User) -> Agent:
     """Preserve the original local agent login used by P1 flows and tests."""
     first_property = db.scalar(
         select(Property)
-        .where(Property.slug.like("demo-%"))
-        .order_by(Property.published_at.desc(), Property.slug)
+        .where(Property.slug.like("demo-%"), Property.status == "published")
+        .order_by(
+            Property.is_featured.desc(),
+            Property.published_at.desc(),
+            Property.created_at.desc(),
+        )
         .limit(1)
     )
     agency = None
