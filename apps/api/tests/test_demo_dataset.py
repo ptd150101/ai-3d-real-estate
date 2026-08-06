@@ -1,4 +1,3 @@
-
 from __future__ import annotations
 
 import re
@@ -10,6 +9,7 @@ from sqlalchemy import func, select
 from app.demo_assets import model_templates
 from app.models import Agency, Agent, Project, Property
 from app.seed import seed_database
+from app.services.demo_seed import reset_demo_data
 from conftest import TestingSessionLocal
 
 
@@ -56,6 +56,27 @@ def test_seed_replaces_stale_unicode_fixture_revision():
         assert db.scalar(select(Property).where(Property.slug == "demo-legacy-dông-anh")) is None
         assert db.scalar(select(Property).where(Property.slug == canonical_slug)) is not None
         assert int(db.scalar(select(func.count(Property.id)).where(Property.slug.like("demo-%"))) or 0) == 72
+
+
+def test_seed_adopts_legacy_agency_name_after_reset():
+    with TestingSessionLocal() as db:
+        reset_demo_data(db)
+        legacy = Agency(name="Nestora Prime", slug="nestora-prime")
+        db.add(legacy)
+        db.commit()
+        legacy_id = legacy.id
+
+        seed_database(db)
+
+        canonical = db.scalar(select(Agency).where(Agency.slug == "demo-nestora-prime"))
+        assert canonical is not None
+        assert canonical.id == legacy_id
+        assert int(
+            db.scalar(select(func.count(Agency.id)).where(Agency.name == "Nestora Prime")) or 0
+        ) == 1
+        assert int(
+            db.scalar(select(func.count(Agency.id)).where(Agency.slug.like("demo-%"))) or 0
+        ) == 4
 
 
 def test_property_search_has_enough_data(client):
