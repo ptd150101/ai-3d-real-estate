@@ -12,6 +12,15 @@ from app.seed import seed_database
 from app.services.demo_seed import reset_demo_data
 from conftest import TestingSessionLocal
 
+_LEGACY_PROPERTY_SLUGS = [
+    "nha-pho-hien-dai-cau-giay",
+    "can-ho-3pn-view-ho-tay",
+    "biet-thu-san-vuon-long-bien",
+    "chung-cu-2pn-nam-tu-liem",
+    "shophouse-ha-dong",
+    "nha-thue-tay-ho-co-3d",
+]
+
 
 def test_demo_dataset_counts_and_idempotency():
     with TestingSessionLocal() as db:
@@ -77,6 +86,47 @@ def test_seed_adopts_legacy_agency_name_after_reset():
         assert int(
             db.scalar(select(func.count(Agency.id)).where(Agency.slug.like("demo-%"))) or 0
         ) == 4
+
+
+def test_seed_removes_pre_catalog_properties_and_project():
+    with TestingSessionLocal() as db:
+        rows = list(
+            db.scalars(
+                select(Property)
+                .where(Property.slug.like("demo-%"))
+                .order_by(Property.slug)
+                .limit(len(_LEGACY_PROPERTY_SLUGS))
+            )
+        )
+        assert len(rows) == len(_LEGACY_PROPERTY_SLUGS)
+        for item, legacy_slug in zip(rows, _LEGACY_PROPERTY_SLUGS, strict=True):
+            item.slug = legacy_slug
+        db.add(
+            Project(
+                name="Westlake Residence",
+                slug="westlake-residence",
+                city="Hà Nội",
+                district="Tây Hồ",
+                address="Đường Võ Chí Công, Tây Hồ, Hà Nội",
+            )
+        )
+        db.commit()
+
+        seed_database(db)
+
+        assert int(db.scalar(select(func.count(Property.id))) or 0) == 72
+        assert int(
+            db.scalar(
+                select(func.count(Property.id)).where(
+                    Property.slug.in_(_LEGACY_PROPERTY_SLUGS)
+                )
+            )
+            or 0
+        ) == 0
+        assert db.scalar(select(Project).where(Project.slug == "westlake-residence")) is None
+        assert int(
+            db.scalar(select(func.count(Property.id)).where(Property.slug.like("demo-%"))) or 0
+        ) == 72
 
 
 def test_property_search_has_enough_data(client):
