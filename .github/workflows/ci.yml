@@ -32,7 +32,7 @@ jobs:
           uv run alembic upgrade head
           test "$(uv run alembic current)" != ""
       - run: uv run python ../../scripts/generate_openapi.py
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with: { name: openapi, path: packages/contracts/openapi.json }
 
   postgres-migration:
@@ -117,7 +117,7 @@ jobs:
       - run: npm --prefix apps/mobile run typecheck
       - run: npm --prefix apps/mobile run export:android
         env: { EXPO_PUBLIC_API_URL: "https://api.example.invalid/api/v1" }
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with: { name: mobile-android-export, path: apps/mobile/dist }
 
   compose:
