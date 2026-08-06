@@ -9,7 +9,30 @@ from sqlalchemy.orm import Session
 from .models import Agency, Agent, Property, User
 from .security import hash_password
 from .services.demo_seed import seed_demo_data
+from .services.p2_intelligence import DISTRICT_PRICE_M2, TYPE_FACTOR
 from .services.p2_tenant import ensure_default_tenant
+
+_DEMO_DISTRICT_PRICE_M2 = {
+    "Tây Hồ": 95_000_000,
+    "Cầu Giấy": 88_000_000,
+    "Long Biên": 70_000_000,
+    "Nam Từ Liêm": 72_000_000,
+    "Hà Đông": 62_000_000,
+    "Ba Đình": 105_000_000,
+    "Thanh Xuân": 78_000_000,
+    "Hai Bà Trưng": 92_000_000,
+    "Hoàng Mai": 60_000_000,
+    "Gia Lâm": 58_000_000,
+    "Đông Anh": 52_000_000,
+}
+_DEMO_TYPE_FACTORS = {
+    "apartment": 1.0,
+    "townhouse": 1.12,
+    "villa": 1.25,
+    "shophouse": 1.18,
+    "studio": 0.92,
+    "penthouse": 1.32,
+}
 
 
 def _ensure_core_user(
@@ -82,8 +105,15 @@ def _ensure_compatibility_agent(db: Session, user: User) -> Agent:
     return agent
 
 
+def _install_demo_valuation_baseline() -> None:
+    """Cover every district and property type represented by the demo catalog."""
+    DISTRICT_PRICE_M2.update(_DEMO_DISTRICT_PRICE_M2)
+    TYPE_FACTOR.update(_DEMO_TYPE_FACTORS)
+
+
 def seed_database(db: Session) -> dict[str, int]:
     """Upsert deterministic local demo data without duplicating existing records."""
+    _install_demo_valuation_baseline()
     admin = _ensure_core_user(
         db,
         email="admin@nestora.vn",
