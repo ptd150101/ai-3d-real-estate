@@ -18,7 +18,7 @@ dependencies = [
   "boto3==1.40.11",
   "pgvector==0.4.1",
   "prometheus-client==0.22.1",
-  "sentry-sdk[fastapi]==2.35.0",
+  "sentry-sdk[fastapi]==2.66.1",
   "reportlab==4.4.3",
   "qrcode[pil]==8.2",
   "pypdf==6.14.2",
