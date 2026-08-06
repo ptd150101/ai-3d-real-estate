@@ -1,0 +1,30 @@
+[
+  {
+    "slug": "demo-nestora-prime",
+    "name": "Nestora Prime",
+    "description": "Đơn vị môi giới bất động sản cao cấp và dữ liệu xác minh tại Hà Nội.",
+    "verified": true,
+    "logo_url": "/api/backend/demo-assets/images/brand/1.svg"
+  },
+  {
+    "slug": "demo-westlake-homes",
+    "name": "Westlake Homes",
+    "description": "Chuyên căn hộ và biệt thự khu vực Tây Hồ, Ba Đình.",
+    "verified": true,
+    "logo_url": "/api/backend/demo-assets/images/brand/2.svg"
+  },
+  {
+    "slug": "demo-hanoi-living",
+    "name": "Hanoi Living",
+    "description": "Tư vấn nhà ở đô thị, căn hộ cho thuê và nhà phố trung tâm.",
+    "verified": true,
+    "logo_url": "/api/backend/demo-assets/images/brand/3.svg"
+  },
+  {
+    "slug": "demo-greenkey-realty",
+    "name": "GreenKey Realty",
+    "description": "Đơn vị phân phối dự án và sản phẩm xanh phía Đông Hà Nội.",
+    "verified": false,
+    "logo_url": "/api/backend/demo-assets/images/brand/4.svg"
+  }
+]

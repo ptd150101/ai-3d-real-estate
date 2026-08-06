@@ -1,18 +1,219 @@
 "use client";
+
 import { FormEvent, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { LeadCapture } from "./LeadCapture";
 import type { ChatResult, Hotspot } from "@/lib/types";
 
-type Message={role:"user"|"assistant";content:string;result?:ChatResult};
-export function ChatPanel({propertyId,hotspot}:{propertyId?:string;hotspot?:Hotspot|null}){
-  const [messages,setMessages]=useState<Message[]>([{role:"assistant",content:"Mình đang xem cùng bạn. Hãy hỏi về giá, pháp lý, từng phòng, tiện ích gần nhà hoặc khoản vay."}]);
-  const [input,setInput]=useState("");const [busy,setBusy]=useState(false);const [sessionId,setSessionId]=useState<string>();const bottom=useRef<HTMLDivElement>(null);
+type Message = { role: "user" | "assistant"; content: string; result?: ChatResult };
+
+export function ChatPanel({
+  propertyId,
+  hotspot,
+}: {
+  propertyId?: string;
+  hotspot?: Hotspot | null;
+}) {
+  const [messages, setMessages] = useState<Message[]>([
+    {
+      role: "assistant",
+      content:
+        "Mình đang xem cùng bạn. Hãy hỏi về giá, pháp lý, từng phòng, tiện ích gần nhà hoặc khoản vay.",
+    },
+  ]);
+  const [input, setInput] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [sessionId, setSessionId] = useState<string>();
+  const bottom = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
     bottom.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
-  useEffect(()=>{if(hotspot)setMessages((m)=>[...m,{role:"assistant",content:`Bạn vừa chọn ${hotspot.label}. ${hotspot.description||"Bạn muốn hỏi gì về khu vực này?"}`}])},[hotspot]);
-  async function sendText(text:string){if(!text.trim()||busy)return;setBusy(true);setInput("");setMessages((m)=>[...m,{role:"user",content:text},{role:"assistant",content:""}]);try{const response=await fetch("/api/backend/chat/stream",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({session_id:sessionId,message:text,context:{current_property_id:propertyId||null,selected_hotspot_id:hotspot?.id||null,filters:{}}})});if(!response.ok||!response.body)throw new Error("Chat unavailable");const reader=response.body.getReader();const decoder=new TextDecoder();let buffer="";let final:ChatResult|undefined;while(true){const{done,value}=await reader.read();if(done)break;buffer+=decoder.decode(value,{stream:true});const events=buffer.split("\n\n");buffer=events.pop()||"";for(const event of events){const line=event.split("\n").find((x)=>x.startsWith("data: "));if(!line)continue;const raw=line.slice(6);if(raw==="[DONE]")continue;const eventData=JSON.parse(raw);if(eventData.type==="delta")setMessages((m)=>{const copy=[...m];copy[copy.length-1]={...copy[copy.length-1],content:copy[copy.length-1].content+eventData.content};return copy});if(eventData.type==="result"){final=eventData.data;setSessionId(final?.session_id);setMessages((m)=>{const copy=[...m];copy[copy.length-1]={...copy[copy.length-1],result:final};return copy});}}}}catch{setMessages((m)=>{const copy=[...m];copy[copy.length-1]={role:"assistant",content:"Không thể kết nối trợ lý lúc này. Vui lòng thử lại."};return copy});}finally{setBusy(false)}}
-  function submit(e:FormEvent){e.preventDefault();void sendText(input)}
-  return <aside className="chat-panel" aria-label="Trợ lý bất động sản AI"><div className="chat-head"><div><strong>Trợ lý Nestora AI</strong><div className="muted" style={{fontSize:'.78rem'}}>Đang hiểu căn nhà bạn xem</div></div><span className="badge badge-brand">● Online</span></div><div className="chat-messages">{messages.map((message,index)=><div key={index} className={`message ${message.role}`}><div>{message.content||"Đang suy nghĩ…"}</div>{message.result?.tool_results.map((tool,i)=><div className="tool-card" key={`${tool.tool}-${i}`} style={{marginTop:8}}><strong>{tool.tool.replaceAll('_',' ')}</strong>{tool.tool==="search_properties"&&Array.isArray(tool.data)&&<div className="stack" style={{marginTop:8}}>{(tool.data as Array<Record<string,unknown>>).slice(0,4).map((p)=><Link key={String(p.id)} href={`/properties/${p.slug}`}><strong>{String(p.title)}</strong><div className="muted">{String(p.price_label)} · {String(p.district)}</div></Link>)}</div>}{tool.tool==="calculate_mortgage"&&typeof tool.data==="object"&&tool.data!==null&&<div className="muted">Khoản trả dự kiến: {new Intl.NumberFormat('vi-VN').format(Number((tool.data as Record<string,unknown>).monthly_payment))} đ/tháng</div>}</div>)}{message.result?.citations.length?<div style={{marginTop:8,fontSize:'.75rem'}} className="muted">Nguồn: {message.result.citations.map((c)=>c.label).join(', ')}</div>:null}{message.result?.disclaimer&&<div style={{marginTop:8,fontSize:'.75rem'}} className="muted">{message.result.disclaimer}</div>}{message.result?.requires_confirmation&&message.result.tool_results.some((t)=>t.tool==='request_human_support')&&<div style={{marginTop:8}}><LeadCapture propertyId={propertyId}/></div>}</div>)}<div ref={bottom}/></div>{messages.at(-1)?.result?.suggested_questions?.length?<div className="suggestions">{messages.at(-1)!.result!.suggested_questions.slice(0,4).map((q)=><button key={q} type="button" onClick={()=>void sendText(q)}>{q}</button>)}</div>:null}<form className="chat-input" onSubmit={submit}><input className="input" value={input} onChange={(e)=>setInput(e.target.value)} placeholder="Hỏi về căn nhà này…" aria-label="Tin nhắn"/><button className="btn btn-primary" disabled={busy}>Gửi</button></form></aside>;
+
+  useEffect(() => {
+    if (!hotspot) return;
+    setMessages((current) => [
+      ...current,
+      {
+        role: "assistant",
+        content: `Bạn vừa chọn ${hotspot.label}. ${
+          hotspot.description || "Bạn muốn hỏi gì về khu vực này?"
+        }`,
+      },
+    ]);
+  }, [hotspot]);
+
+  async function sendText(text: string) {
+    if (!text.trim() || busy) return;
+    setBusy(true);
+    setInput("");
+    setMessages((current) => [
+      ...current,
+      { role: "user", content: text },
+      { role: "assistant", content: "" },
+    ]);
+    try {
+      const response = await fetch("/api/backend/chat/stream", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          session_id: sessionId,
+          message: text,
+          context: {
+            current_property_id: propertyId || null,
+            selected_hotspot_id: hotspot?.id || null,
+            filters: {},
+          },
+        }),
+      });
+      if (!response.ok || !response.body) throw new Error("Chat unavailable");
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      let final: ChatResult | undefined;
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const events = buffer.split("\n\n");
+        buffer = events.pop() || "";
+        for (const event of events) {
+          const line = event.split("\n").find((entry) => entry.startsWith("data: "));
+          if (!line) continue;
+          const raw = line.slice(6);
+          if (raw === "[DONE]") continue;
+          const eventData = JSON.parse(raw);
+          if (eventData.type === "delta") {
+            setMessages((current) => {
+              const copy = [...current];
+              copy[copy.length - 1] = {
+                ...copy[copy.length - 1],
+                content: copy[copy.length - 1].content + eventData.content,
+              };
+              return copy;
+            });
+          }
+          if (eventData.type === "result") {
+            final = eventData.data;
+            setSessionId(final?.session_id);
+            setMessages((current) => {
+              const copy = [...current];
+              copy[copy.length - 1] = { ...copy[copy.length - 1], result: final };
+              return copy;
+            });
+          }
+        }
+      }
+    } catch {
+      setMessages((current) => {
+        const copy = [...current];
+        copy[copy.length - 1] = {
+          role: "assistant",
+          content: "Không thể kết nối trợ lý lúc này. Vui lòng thử lại.",
+        };
+        return copy;
+      });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function submit(event: FormEvent) {
+    event.preventDefault();
+    void sendText(input);
+  }
+
+  return (
+    <aside className="chat-panel" aria-label="Trợ lý bất động sản AI">
+      <div className="chat-head">
+        <div>
+          <strong>Trợ lý Nestora AI</strong>
+          <div className="muted" style={{ fontSize: ".78rem" }}>
+            Đang hiểu căn nhà bạn xem
+          </div>
+        </div>
+        <span className="badge badge-brand">● Online</span>
+      </div>
+      <div className="chat-messages">
+        {messages.map((message, index) => (
+          <div key={index} className={`message ${message.role}`}>
+            <div>{message.content || "Đang suy nghĩ…"}</div>
+            {message.result?.tool_results.map((tool, toolIndex) => (
+              <div
+                className="tool-card"
+                key={`${tool.tool}-${toolIndex}`}
+                style={{ marginTop: 8 }}
+              >
+                <strong>{tool.tool.replaceAll("_", " ")}</strong>
+                {tool.tool === "search_properties" && Array.isArray(tool.data) && (
+                  <div className="stack" style={{ marginTop: 8 }}>
+                    {(tool.data as Array<Record<string, unknown>>).slice(0, 4).map((property) => (
+                      <Link key={String(property.id)} href={`/properties/${property.slug}`}>
+                        <strong>{String(property.title)}</strong>
+                        <div className="muted">
+                          {String(property.price_label)} · {String(property.district)}
+                        </div>
+                      </Link>
+                    ))}
+                  </div>
+                )}
+                {tool.tool === "calculate_mortgage" &&
+                  typeof tool.data === "object" &&
+                  tool.data !== null && (
+                    <div className="muted">
+                      Khoản trả dự kiến:{" "}
+                      {new Intl.NumberFormat("vi-VN").format(
+                        Number((tool.data as Record<string, unknown>).monthly_payment),
+                      )}{" "}
+                      đ/tháng
+                    </div>
+                  )}
+              </div>
+            ))}
+            {message.result?.citations.length ? (
+              <div style={{ marginTop: 8, fontSize: ".75rem" }} className="muted">
+                Nguồn: {message.result.citations.map((citation) => citation.label).join(", ")}
+              </div>
+            ) : null}
+            {message.result?.disclaimer && (
+              <div style={{ marginTop: 8, fontSize: ".75rem" }} className="muted">
+                {message.result.disclaimer}
+              </div>
+            )}
+            {message.result?.requires_confirmation &&
+              message.result.tool_results.some((tool) => tool.tool === "request_human_support") && (
+                <div style={{ marginTop: 8 }}>
+                  <LeadCapture propertyId={propertyId} />
+                </div>
+              )}
+          </div>
+        ))}
+        <div ref={bottom} />
+      </div>
+      {messages.at(-1)?.result?.suggested_questions?.length ? (
+        <div className="suggestions">
+          {messages
+            .at(-1)!
+            .result!.suggested_questions.slice(0, 4)
+            .map((question) => (
+              <button key={question} type="button" onClick={() => void sendText(question)}>
+                {question}
+              </button>
+            ))}
+        </div>
+      ) : null}
+      <form className="chat-input" onSubmit={submit}>
+        <input
+          className="input"
+          value={input}
+          onChange={(event) => setInput(event.target.value)}
+          placeholder="Hỏi về căn nhà này…"
+          aria-label="Tin nhắn"
+        />
+        <button className="btn btn-primary" disabled={busy}>
+          Gửi
+        </button>
+      </form>
+    </aside>
+  );
 }

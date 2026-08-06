@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
+import "./dollhouse.css";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";

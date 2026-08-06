@@ -7,7 +7,8 @@ A production-oriented real-estate marketplace for Vietnam with verified listing 
 - Next.js App Router public website, responsive desktop/mobile UI and SEO metadata.
 - Search filters, Vietnamese natural-language query parsing, list/map views and pagination.
 - Property detail, galleries, projects, agents, nearby places, favorites and 2–4 property comparison.
-- GLB viewer using React Three Fiber: lazy loading, orbit, floor visibility, furniture toggle, hotspots, quality scaling, fullscreen, reset and walk mode.
+- Full-width React Three Fiber dollhouse viewer with orthographic/orbit/walk modes, auto-fit, floor isolation, floor explosion, roof and furniture toggles, room hotspots, quality scaling and fullscreen.
+- Deterministic local demo catalog with 72 listings, 24 interactive 3D listings, 8 generated GLB templates, 12 agents, 4 agencies and 6 projects.
 - Contextual chatbot with SSE streaming and deterministic tools for property facts, search, comparison, nearby places, mortgage, appointments, lead capture and human handoff.
 - Verified-document RAG with deterministic embeddings for SQLite and pgvector/HNSW retrieval on PostgreSQL.
 - FastAPI, SQLAlchemy, Alembic, PostgreSQL/PostGIS, Redis cache adapter, MinIO/S3 storage and a background media worker.
@@ -78,6 +79,34 @@ scripts\dev.bat infra
 scripts\dev.bat api
 ```
 
+## Deterministic demo dataset
+
+The API startup performs an idempotent upsert. You can also run the seed explicitly:
+
+```bash
+make seed-demo
+# or
+cd apps/api
+uv run --env-file ../../.env python -m app.cli.seed_demo --preset mvp --upsert
+```
+
+Reset only records owned by the demo catalog and rebuild all generated assets:
+
+```bash
+make reset-demo
+```
+
+The `mvp` preset contains:
+
+- 72 published properties across 11 Hà Nội districts, with ASCII-only canonical slugs and compatibility for the original public demo URL.
+- 48 sale and 24 rental listings.
+- 24 properties with interactive 3D.
+- 8 deterministic GLB dollhouse templates generated locally.
+- 4 agencies, 12 agents and 6 projects.
+- Five local SVG gallery images, 5–9 amenities, four nearby places and one knowledge document per listing.
+
+Fixture reconstruction accepts a minimum of one capture in non-production environments, emits real GLB content, advances through the normal review workflow and synchronizes an approved artifact into `PropertyModel3D`.
+
 ## Local checks
 
 ```bash
@@ -92,7 +121,7 @@ npm --prefix ../../apps/web run build
 
 Seed users are documented in `docs/DEPLOYMENT.md`. Replace every local development credential and `SECRET_KEY` before exposing the system publicly.
 
-The repository includes a compact sample GLB at `apps/web/public/models/demo-house.glb`. Production assets should be optimized with glTF Transform or an equivalent media pipeline before publishing.
+Production assets should still be optimized with glTF Transform or an equivalent media pipeline before publishing.
 
 ## Architecture
 
@@ -101,7 +130,7 @@ Browser
   └─ Next.js Web/BFF
       ├─ SSR/SEO pages
       ├─ MapLibre search
-      ├─ React Three Fiber viewer
+      ├─ React Three Fiber dollhouse viewer
       └─ HTTP-only auth proxy
            └─ FastAPI
                ├─ PostgreSQL + PostGIS + pgvector
