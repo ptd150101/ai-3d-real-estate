@@ -49,7 +49,7 @@ def generate_slots(db: Session, agent_id: str, start_date: date, days: int = 14)
         for rule in rules:
             if current_date.weekday() != rule.weekday:
                 continue
-            tz = ZoneInfo(rule.timezone)
+            tz = ZoneInfo(rule.timezone or "Asia/Ho_Chi_Minh")
             cursor_local = datetime.combine(current_date, time(rule.start_minute // 60, rule.start_minute % 60), tzinfo=tz)
             end_local = datetime.combine(current_date, time.min, tzinfo=tz) + timedelta(minutes=rule.end_minute)
             while cursor_local + timedelta(minutes=rule.slot_minutes) <= end_local:
