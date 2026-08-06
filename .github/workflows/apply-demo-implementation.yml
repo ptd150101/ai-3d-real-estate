@@ -1,17 +1,19 @@
 name: Apply demo implementation
 
 on:
-  push:
+  pull_request:
     branches:
-      - agent/implement-demo-data-and-dollhouse
+      - main
     paths:
       - ".github/workflows/apply-demo-implementation.yml"
+      - "scripts/.demo_impl_payload_*"
 
 permissions:
   contents: write
 
 jobs:
   apply:
+    if: github.head_ref == 'agent/implement-demo-data-and-dollhouse'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
