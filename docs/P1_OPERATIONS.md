@@ -2,7 +2,9 @@
 
 ## Worker jobs
 
-Run `python -m app.worker`. The worker claims `durable_jobs` with a lease and processes notification delivery, saved-search matching, calendar sync, CRM sync, brochure rendering, analytics aggregation, panorama validation and legal watermark integration points.
+From `apps/api`, run `uv run --env-file ../../.env python -m app.worker`. The worker claims `durable_jobs` with a lease and processes notification delivery, saved-search matching, calendar sync, CRM sync, brochure rendering, analytics aggregation, panorama validation and legal watermark integration points.
+
+Inside the pre-synced container image, the equivalent command is `uv run --no-sync python -m app.worker`.
 
 ## Provider activation
 

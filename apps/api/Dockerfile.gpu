@@ -1,19 +1,24 @@
 ARG NERFSTUDIO_IMAGE=ghcr.io/nerfstudio-project/nerfstudio:1.1.3
+FROM ghcr.io/astral-sh/uv:0.11.32 AS uv
 FROM ${NERFSTUDIO_IMAGE}
 
 USER root
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
+    UV_COMPILE_BYTECODE=1 \
+    UV_LINK_MODE=copy \
     HOME=/home/appuser \
     PATH=/home/appuser/.local/bin:${PATH}
 WORKDIR /app
 
-COPY requirements.txt /tmp/nestora-requirements.txt
-RUN python -m pip install --no-cache-dir -r /tmp/nestora-requirements.txt \
+COPY --from=uv /uv /uvx /usr/local/bin/
+COPY pyproject.toml /app/pyproject.toml
+RUN uv sync --no-dev --no-install-project \
     && command -v ns-process-data \
     && command -v ns-train \
     && command -v ns-export \
     && command -v colmap
+
 COPY . /app
 RUN useradd --uid 10001 --create-home --shell /bin/bash appuser \
     && mkdir -p /app/storage/reconstruction-work /home/appuser/.cache \
@@ -21,5 +26,5 @@ RUN useradd --uid 10001 --create-home --shell /bin/bash appuser \
 USER appuser
 
 HEALTHCHECK --interval=60s --timeout=10s --start-period=30s --retries=3 \
-    CMD command -v ns-train >/dev/null && command -v colmap >/dev/null && python -c "import app.worker" || exit 1
-CMD ["python", "-m", "app.worker"]
+    CMD command -v ns-train >/dev/null && command -v colmap >/dev/null && uv run --no-sync python -c "import app.worker" || exit 1
+CMD ["uv", "run", "--no-sync", "python", "-m", "app.worker"]

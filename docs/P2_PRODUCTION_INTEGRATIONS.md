@@ -87,5 +87,5 @@ App Store/Play Store signing cannot be completed by source code alone; it requir
 
 - Migration `0003` uses frozen table/column assertions and Alembic operations instead of `Base.metadata.create_all`.
 - Migration `0004` adds positive-amount/direction constraints, provider indexes and append-only ledger triggers.
-- Production startup does not call `create_all`; deployment must run `alembic upgrade head` first.
-- `security.yml` runs CodeQL, Bandit, pip-audit, npm audit, Gitleaks and Trivy.
+- Production startup does not call `create_all`; deployment must run `uv run alembic upgrade head` first.
+- `security.yml` runs CodeQL, Bandit, pip-audit, npm audit, Gitleaks and Trivy; Python tools are invoked through `uv run`.
