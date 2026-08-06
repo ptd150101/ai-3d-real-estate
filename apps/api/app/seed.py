@@ -112,7 +112,6 @@ def _install_demo_valuation_baseline() -> None:
     TYPE_FACTOR.update(_DEMO_TYPE_FACTORS)
 
 
-
 def _reset_stale_demo_catalog(db: Session) -> None:
     # Replace older fixture revisions instead of accumulating duplicate listings.
     rows = json.loads((FIXTURE_ROOT / "properties.json").read_text(encoding="utf-8"))
@@ -122,6 +121,25 @@ def _reset_stale_demo_catalog(db: Session) -> None:
     )
     if current_slugs and current_slugs != desired_slugs:
         reset_demo_data(db)
+
+
+def _adopt_legacy_demo_agencies(db: Session) -> None:
+    """Reuse pre-catalog agencies whose unique name matches a demo fixture.
+
+    Older seed revisions created agencies such as ``Nestora Prime`` under a
+    non-demo slug. The current catalog uses canonical ``demo-*`` slugs, while
+    ``agencies.name`` is unique. Migrating the existing row avoids a duplicate
+    name INSERT and preserves foreign-key references.
+    """
+    rows = json.loads((FIXTURE_ROOT / "agencies.json").read_text(encoding="utf-8"))
+    for row in rows:
+        canonical_slug = str(row["slug"])
+        if db.scalar(select(Agency.id).where(Agency.slug == canonical_slug)):
+            continue
+        legacy = db.scalar(select(Agency).where(Agency.name == str(row["name"])))
+        if legacy:
+            legacy.slug = canonical_slug
+    db.flush()
 
 
 def seed_database(db: Session) -> dict[str, int]:
@@ -153,6 +171,7 @@ def seed_database(db: Session) -> dict[str, int]:
     )
     db.flush()
     _reset_stale_demo_catalog(db)
+    _adopt_legacy_demo_agencies(db)
     result = seed_demo_data(db, admin=admin, preset="mvp")
     _ensure_compatibility_agent(db, compatibility_agent_user)
     ensure_default_tenant(db)
