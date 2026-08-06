@@ -43,7 +43,7 @@ from ..security import hash_password
 from .p2_tenant import initialize_organization
 from .rag import index_document
 
-DEMO_DATASET_VERSION = 2
+DEMO_DATASET_VERSION = 3
 DEMO_PREFIX = "demo-"
 _IMAGE_POOL = {
     "apartment": 15,

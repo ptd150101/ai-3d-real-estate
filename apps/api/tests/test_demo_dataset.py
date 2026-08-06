@@ -1,5 +1,7 @@
+
 from __future__ import annotations
 
+import re
 import struct
 from collections import Counter
 
@@ -17,8 +19,11 @@ def test_demo_dataset_counts_and_idempotency():
         seed_database(db)
         after = int(db.scalar(select(func.count(Property.id))) or 0)
         rows = list(db.scalars(select(Property).where(Property.slug.like("demo-%"))))
+        slugs = [item.slug for item in rows]
         assert before == after == 72
         assert len(rows) == 72
+        assert len(set(slugs)) == 72
+        assert all(re.fullmatch(r"[a-z0-9-]+", slug) for slug in slugs)
         assert sum(item.has_3d for item in rows) == 24
         assert sum(item.is_verified for item in rows) == 48
         assert sum(item.is_owner_listing for item in rows) == 20
@@ -38,6 +43,21 @@ def test_demo_dataset_counts_and_idempotency():
         assert int(db.scalar(select(func.count(Project.id)).where(Project.slug.like("demo-%"))) or 0) == 6
 
 
+def test_seed_replaces_stale_unicode_fixture_revision():
+    with TestingSessionLocal() as db:
+        item = db.scalar(
+            select(Property).where(Property.slug.like("demo-%")).order_by(Property.slug).limit(1)
+        )
+        assert item is not None
+        canonical_slug = item.slug
+        item.slug = "demo-legacy-dông-anh"
+        db.commit()
+        seed_database(db)
+        assert db.scalar(select(Property).where(Property.slug == "demo-legacy-dông-anh")) is None
+        assert db.scalar(select(Property).where(Property.slug == canonical_slug)) is not None
+        assert int(db.scalar(select(func.count(Property.id)).where(Property.slug.like("demo-%"))) or 0) == 72
+
+
 def test_property_search_has_enough_data(client):
     response = client.get("/api/v1/properties", params={"page": 1, "page_size": 48})
     assert response.status_code == 200, response.text
@@ -45,14 +65,21 @@ def test_property_search_has_enough_data(client):
     assert payload["total"] == 72
     assert payload["pages"] == 2
     assert len(payload["items"]) == 48
-
     three_d = client.get("/api/v1/properties", params={"has_3d": True, "page_size": 48})
     assert three_d.status_code == 200, three_d.text
     assert three_d.json()["total"] == 24
-
     rent = client.get("/api/v1/properties", params={"transaction_type": "rent", "page_size": 48})
     assert rent.status_code == 200, rent.text
     assert rent.json()["total"] == 24
+
+
+def test_legacy_property_url_resolves_to_current_catalog(client):
+    response = client.get("/api/v1/properties/nha-pho-hien-dai-cau-giay")
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    assert payload["slug"].startswith("demo-")
+    assert payload["district"] == "Cầu Giấy"
+    assert payload["has_3d"] is True
 
 
 def test_demo_property_has_complete_related_data(client):
@@ -78,7 +105,6 @@ def test_generated_demo_assets_are_valid(client):
     assert version == 2
     assert total_length == len(response.content)
     assert len(response.content) > 2_000
-
     payloads: list[bytes] = []
     for template_id in model_templates():
         asset = client.get(f"/api/v1/demo-assets/models/{template_id}.glb")
@@ -87,7 +113,6 @@ def test_generated_demo_assets_are_valid(client):
         payloads.append(asset.content)
     assert len(payloads) == 8
     assert len(set(payloads)) == 8
-
     image = client.get("/api/v1/demo-assets/images/apartment/1.svg")
     assert image.status_code == 200, image.text
     assert image.headers["content-type"].startswith("image/svg+xml")

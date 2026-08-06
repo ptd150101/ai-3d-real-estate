@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import os
 import secrets
 
@@ -8,7 +9,7 @@ from sqlalchemy.orm import Session
 
 from .models import Agency, Agent, Property, User
 from .security import hash_password
-from .services.demo_seed import seed_demo_data
+from .services.demo_seed import FIXTURE_ROOT, reset_demo_data, seed_demo_data
 from .services.p2_intelligence import DISTRICT_PRICE_M2, TYPE_FACTOR
 from .services.p2_tenant import ensure_default_tenant
 
@@ -111,6 +112,18 @@ def _install_demo_valuation_baseline() -> None:
     TYPE_FACTOR.update(_DEMO_TYPE_FACTORS)
 
 
+
+def _reset_stale_demo_catalog(db: Session) -> None:
+    # Replace older fixture revisions instead of accumulating duplicate listings.
+    rows = json.loads((FIXTURE_ROOT / "properties.json").read_text(encoding="utf-8"))
+    desired_slugs = {str(row["slug"]) for row in rows}
+    current_slugs = set(
+        db.scalars(select(Property.slug).where(Property.slug.like("demo-%")))
+    )
+    if current_slugs and current_slugs != desired_slugs:
+        reset_demo_data(db)
+
+
 def seed_database(db: Session) -> dict[str, int]:
     """Upsert deterministic local demo data without duplicating existing records."""
     _install_demo_valuation_baseline()
@@ -139,6 +152,7 @@ def seed_database(db: Session) -> dict[str, int]:
         password_env="SEED_AGENT_PASSWORD",
     )
     db.flush()
+    _reset_stale_demo_catalog(db)
     result = seed_demo_data(db, admin=admin, preset="mvp")
     _ensure_compatibility_agent(db, compatibility_agent_user)
     ensure_default_tenant(db)

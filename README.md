@@ -98,7 +98,7 @@ make reset-demo
 
 The `mvp` preset contains:
 
-- 72 published properties across 11 Hà Nội districts.
+- 72 published properties across 11 Hà Nội districts, with ASCII-only canonical slugs and compatibility for the original public demo URL.
 - 48 sale and 24 rental listings.
 - 24 properties with interactive 3D.
 - 8 deterministic GLB dollhouse templates generated locally.
