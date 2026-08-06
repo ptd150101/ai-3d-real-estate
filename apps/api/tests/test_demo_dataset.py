@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import re
 import struct
+import warnings
 from collections import Counter
 
 from sqlalchemy import func, select
+from sqlalchemy.exc import SAWarning
 
 from app.demo_assets import model_templates
 from app.models import Agency, Agent, Project, Property
@@ -88,7 +90,7 @@ def test_seed_adopts_legacy_agency_name_after_reset():
         ) == 4
 
 
-def test_seed_removes_pre_catalog_properties_and_project():
+def test_seed_removes_pre_catalog_properties_and_project_without_warnings():
     with TestingSessionLocal() as db:
         rows = list(
             db.scalars(
@@ -112,8 +114,14 @@ def test_seed_removes_pre_catalog_properties_and_project():
         )
         db.commit()
 
-        seed_database(db)
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always", SAWarning)
+            seed_database(db)
 
+        sqlalchemy_warnings = [
+            warning for warning in caught if issubclass(warning.category, SAWarning)
+        ]
+        assert sqlalchemy_warnings == []
         assert int(db.scalar(select(func.count(Property.id))) or 0) == 72
         assert int(
             db.scalar(
