@@ -69,8 +69,8 @@ Cross-platform helpers accept one of `infra`, `api`, `worker` or `web`:
 ```
 
 ```bash
-./scripts/dev.sh infra
-./scripts/dev.sh api
+bash scripts/dev.sh infra
+bash scripts/dev.sh api
 ```
 
 ```bat
