@@ -1,0 +1,36 @@
+name: Apply demo implementation
+
+on:
+  push:
+    branches:
+      - agent/implement-demo-data-and-dollhouse
+    paths:
+      - ".github/workflows/apply-demo-implementation.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/implement-demo-data-and-dollhouse
+          fetch-depth: 0
+      - name: Materialize implementation
+        run: |
+          cat scripts/.demo_impl_payload_00 \
+              scripts/.demo_impl_payload_01 \
+              scripts/.demo_impl_payload_02 \
+              scripts/.demo_impl_payload_03 \
+              scripts/.demo_impl_payload_04 > /tmp/apply_demo_implementation.py
+          python /tmp/apply_demo_implementation.py
+          rm -f scripts/.demo_impl_payload_*
+      - name: Commit implementation
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Implement deterministic demo catalog and dollhouse viewer"
+          git push origin HEAD:agent/implement-demo-data-and-dollhouse
