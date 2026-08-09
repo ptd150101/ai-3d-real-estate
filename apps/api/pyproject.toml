@@ -5,7 +5,7 @@ description = "Nestora FastAPI backend"
 requires-python = ">=3.13,<3.14"
 dependencies = [
   "fastapi==0.139.2",
-  "uvicorn[standard]==0.35.0",
+  "uvicorn[standard]==0.52.1",
   "sqlalchemy==2.0.50",
   "psycopg[binary]==3.2.9",
   "alembic==1.18.4",
