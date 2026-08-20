@@ -9,6 +9,7 @@ A production-oriented real-estate marketplace for Vietnam with verified listing 
 - Property detail, galleries, projects, agents, nearby places, favorites and 2–4 property comparison.
 - Full-width React Three Fiber dollhouse viewer with orthographic/orbit/walk modes, auto-fit, floor isolation, floor explosion, roof and furniture toggles, room hotspots, quality scaling and fullscreen.
 - Deterministic local demo catalog with 72 listings, 24 interactive 3D listings, 8 generated GLB templates, 12 agents, 4 agencies and 6 projects.
+- Optional resumable scale dataset that expands the catalog to 1,000,000 mock properties without storing a million fixture objects in Git.
 - Contextual chatbot with SSE streaming and deterministic tools for property facts, search, comparison, nearby places, mortgage, appointments, lead capture and human handoff.
 - Verified-document RAG with deterministic embeddings for SQLite and pgvector/HNSW retrieval on PostgreSQL.
 - FastAPI, SQLAlchemy, Alembic, PostgreSQL/PostGIS, Redis cache adapter, MinIO/S3 storage and a background media worker.
@@ -106,6 +107,39 @@ The `mvp` preset contains:
 - Five local SVG gallery images, 5–9 amenities, four nearby places and one knowledge document per listing.
 
 Fixture reconstruction accepts a minimum of one capture in non-production environments, emits real GLB content, advances through the normal review workflow and synchronizes an approved artifact into `PropertyModel3D`.
+
+### Million-property scale dataset
+
+For search, filtering, pagination and load testing, keep the 72 rich showcase listings and add lightweight deterministic rows until the database contains exactly 1,000,000 properties:
+
+```bash
+cd apps/api
+uv run --env-file ../../.env python -m app.cli.seed_demo --preset million --count 1000000 --batch-size 50000
+```
+
+The scale preset:
+
+- Keeps the 72 showcase properties and creates 999,928 `mock-*` properties by default.
+- Covers 14 Hà Nội districts and six property types with deterministic sale/rent prices, areas, bedrooms, coordinates, legal status, furnishing and agent ownership.
+- Gives every scale listing one local SVG cover image so search cards remain useful without creating five million gallery rows.
+- Does not create RAG documents, feature rows or 3D models for scale listings; those remain concentrated in the rich showcase catalog.
+- Commits each batch and resumes from the last contiguous `mock-*` sequence after an interrupted run.
+- Uses server-side PostgreSQL `generate_series` for fast bulk creation and a portable SQLAlchemy fallback for tests/SQLite.
+- Runs PostgreSQL `ANALYZE` after completion and clears property facet caches.
+
+Try a smaller dataset first if you only want to validate the flow:
+
+```bash
+uv run --env-file ../../.env python -m app.cli.seed_demo --preset million --count 10000 --batch-size 5000
+```
+
+To rebuild all demo/scale mock data from scratch:
+
+```bash
+uv run --env-file ../../.env python -m app.cli.seed_demo --preset million --count 1000000 --batch-size 50000 --reset-demo --force-assets
+```
+
+A million properties plus one media row per scale listing can consume substantial PostgreSQL disk space and WAL. The exact size and seed time depend on your machine, PostgreSQL settings and storage speed.
 
 ## Local checks
 
