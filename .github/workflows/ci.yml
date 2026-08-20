@@ -98,15 +98,18 @@ jobs:
           SEED_BUYER_PASSWORD: test-buyer-password
         run: |
           uv run python -m app.cli.seed_demo --preset million --count 1072 --batch-size 500
-          test "$(docker exec p2-postgres psql -U nestora -d nestora -Atqc 'select count(*) from properties' | tr -d '\r')" = "1072"
-          test "$(docker exec p2-postgres psql -U nestora -d nestora -Atqc \"select count(*) from property_media pm join properties p on p.id=pm.property_id where p.slug like 'mock-%'\" | tr -d '\r')" = "1000"
+          property_count="$(docker exec p2-postgres psql -U nestora -d nestora -Atqc 'select count(*) from properties' | tr -d '\r')"
+          scale_media_count="$(docker exec p2-postgres psql -U nestora -d nestora -Atqc "select count(*) from property_media pm join properties p on p.id=pm.property_id where p.slug like 'mock-%'" | tr -d '\r')"
+          test "$property_count" = "1072"
+          test "$scale_media_count" = "1000"
           uv run python - <<'PY'
           from app.database import SessionLocal
           from app.services.scale_seed import reset_scale_properties
           with SessionLocal() as db:
               assert reset_scale_properties(db) == 1000
           PY
-          test "$(docker exec p2-postgres psql -U nestora -d nestora -Atqc 'select count(*) from properties' | tr -d '\r')" = "72"
+          property_count="$(docker exec p2-postgres psql -U nestora -d nestora -Atqc 'select count(*) from properties' | tr -d '\r')"
+          test "$property_count" = "72"
       - if: always()
         run: docker rm -f p2-postgres || true
 
