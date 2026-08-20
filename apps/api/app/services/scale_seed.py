@@ -382,8 +382,16 @@ ON CONFLICT (id) DO NOTHING
 
 
 def reset_scale_properties(db: Session) -> int:
-    count = int(db.scalar(select(func.count(Property.id)).where(Property.slug.like(f"{SCALE_PREFIX}%"))) or 0)
+    scale_filter = Property.slug.like(f"{SCALE_PREFIX}%")
+    count = int(db.scalar(select(func.count(Property.id)).where(scale_filter)) or 0)
     if count:
+        dialect = db.bind.dialect.name if db.bind is not None else "unknown"
+        if dialect != "postgresql":
+            scale_ids = select(Property.id).where(Property.slug.like(f"{SCALE_PREFIX}%"))
+            db.execute(
+                delete(PropertyMedia).where(PropertyMedia.property_id.in_(scale_ids)),
+                execution_options={"synchronize_session": False},
+            )
         db.execute(
             delete(Property).where(Property.slug.like(f"{SCALE_PREFIX}%")),
             execution_options={"synchronize_session": False},
