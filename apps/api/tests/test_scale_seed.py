@@ -3,6 +3,7 @@ from __future__ import annotations
 from sqlalchemy import func, select
 
 from app.models import Property, PropertyMedia
+from app.seed import seed_database
 from app.services.scale_seed import SCALE_PREFIX, reset_scale_properties, seed_scale_properties
 from conftest import TestingSessionLocal
 
@@ -72,6 +73,25 @@ def test_scale_seed_can_resume_to_a_larger_target():
             assert second["scale_properties"] == 100
             assert second["scale_created"] == 50
             assert int(db.scalar(select(func.count(Property.id))) or 0) == 172
+        finally:
+            reset_scale_properties(db)
+
+
+def test_normal_startup_seed_preserves_scale_dataset():
+    with TestingSessionLocal() as db:
+        reset_scale_properties(db)
+        try:
+            seed_scale_properties(db, target_total=92, batch_size=20)
+            seed_database(db)
+            assert int(
+                db.scalar(
+                    select(func.count(Property.id)).where(
+                        Property.slug.like(f"{SCALE_PREFIX}%")
+                    )
+                )
+                or 0
+            ) == 20
+            assert int(db.scalar(select(func.count(Property.id))) or 0) == 92
         finally:
             reset_scale_properties(db)
 
