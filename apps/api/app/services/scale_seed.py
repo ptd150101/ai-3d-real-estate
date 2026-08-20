@@ -208,7 +208,7 @@ WITH source AS (
     SELECT
         gs AS n,
         md5('nestora-scale-property-' || gs::text) AS h
-    FROM generate_series(:start_sequence, :end_sequence) AS gs
+    FROM generate_series(CAST(:start_sequence AS bigint), CAST(:end_sequence AS bigint)) AS gs
 ), dimensions AS (
     SELECT
         n,
@@ -354,7 +354,7 @@ WITH source AS (
             WHEN (gs % 100) < 95 THEN 'studio'
             ELSE 'penthouse'
         END AS property_type
-    FROM generate_series(:start_sequence, :end_sequence) AS gs
+    FROM generate_series(CAST(:start_sequence AS bigint), CAST(:end_sequence AS bigint)) AS gs
 ), image_data AS (
     SELECT
         *,
