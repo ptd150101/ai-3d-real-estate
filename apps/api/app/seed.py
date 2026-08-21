@@ -25,6 +25,9 @@ _DEMO_DISTRICT_PRICE_M2 = {
     "Hoàng Mai": 60_000_000,
     "Gia Lâm": 58_000_000,
     "Đông Anh": 52_000_000,
+    "Bắc Từ Liêm": 65_000_000,
+    "Đống Đa": 90_000_000,
+    "Hoàn Kiếm": 120_000_000,
 }
 _DEMO_TYPE_FACTORS = {
     "apartment": 1.0,
