@@ -16,6 +16,15 @@ const allowedAdvisories = new Set([
   "GHSA-5p2g-fcmc-qvqq",
 ]);
 
+// npm reports these two as meta-vulnerabilities that only inherit the image-size finding,
+// but omits the advisory object entirely. Allow them only while they have no advisory ID;
+// a future direct advisory on either package will still fail below.
+const allowedEmptyMetaPackages = new Set([
+  "metro-config",
+  "metro-transform-worker",
+]);
+
+const highSeverities = new Set(["high", "critical"]);
 const memo = new Map();
 
 function advisoryIdsFor(packageName, stack = new Set()) {
@@ -50,11 +59,13 @@ const blocked = [];
 const allowed = [];
 
 for (const [packageName, entry] of Object.entries(vulnerabilities)) {
-  if (!new Set(["high", "critical"]).has(entry.severity)) continue;
+  if (!highSeverities.has(entry.severity)) continue;
 
   const advisoryIds = advisoryIdsFor(packageName);
   const unsupported = [...advisoryIds].filter((id) => !allowedAdvisories.has(id));
-  if (advisoryIds.size === 0 || unsupported.length > 0) {
+  const allowedEmptyMeta = advisoryIds.size === 0 && allowedEmptyMetaPackages.has(packageName);
+
+  if ((!allowedEmptyMeta && advisoryIds.size === 0) || unsupported.length > 0) {
     blocked.push({
       packageName,
       severity: entry.severity,
@@ -65,6 +76,7 @@ for (const [packageName, entry] of Object.entries(vulnerabilities)) {
       packageName,
       severity: entry.severity,
       advisories: [...advisoryIds],
+      metaOnly: allowedEmptyMeta,
     });
   }
 }
