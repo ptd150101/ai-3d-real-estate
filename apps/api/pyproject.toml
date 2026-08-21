@@ -15,7 +15,7 @@ dependencies = [
   "python-multipart==0.0.31",
   "httpx==0.28.1",
   "redis==6.4.0",
-  "boto3==1.40.11",
+  "boto3==1.43.65",
   "pgvector==0.4.1",
   "prometheus-client==0.22.1",
   "sentry-sdk[fastapi]==2.35.0",
